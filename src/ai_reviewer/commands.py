@@ -216,7 +216,12 @@ class CommandDispatcher:
     def _handle_explain(
         self, owner: str, repo: str, issue_number: int, is_pr: bool
     ) -> dict[str, Any]:
-        """Explain current review findings in natural, educational language using Gemini provider."""
+        """Explain current review findings in natural, educational language.
+
+        First attempts to retrieve and explain findings from the existing JIAN
+        summary comment.  Falls back to a live re-review only when no prior
+        summary exists.
+        """
         if not is_pr:
             msg = (
                 f"{COMMAND_REPLY_MARKER}\n"
@@ -226,7 +231,25 @@ class CommandDispatcher:
             self.github_client.create_issue_comment(owner, repo, issue_number, msg)
             return {"status": "rejected", "reason": "not_a_pull_request", "command": "explain"}
 
-        # Fetch PR details and changed files
+        # ── Step 1: look for an existing JIAN summary comment ─────────────────
+        prior_summary = self.github_client.get_pr_review_summary_comment(
+            owner, repo, issue_number
+        )
+
+        if prior_summary is not None:
+            # Build explanation from the existing summary text; we don't re-review.
+            reply = self._build_explain_reply_from_summary(
+                prior_summary, owner, repo, issue_number
+            )
+            self.github_client.create_issue_comment(owner, repo, issue_number, reply)
+            return {
+                "status": "success",
+                "command": "explain",
+                "source": "prior_summary",
+                "findings_explained": None,  # count not trivially parseable from markdown
+            }
+
+        # ── Step 2: no prior summary — fall back to a live review ─────────────
         pr_data = self.github_client.get_pull_request(owner, repo, issue_number)
         head_sha = pr_data["head"]["sha"]
         base_ref = pr_data["base"]["ref"]
@@ -252,42 +275,117 @@ class CommandDispatcher:
         )
 
         review_result, _ = self.orchestrator.run_review(context)
-
-        if not review_result.findings:
-            reply = (
-                f"{COMMAND_REPLY_MARKER}\n"
-                "### 🎓 JIAN Explanation\n\n"
-                f"I reviewed commit `{head_sha[:8]}` and found **no blocking issues or defects**! "
-                "The changes adhere to clean code standards and pass automated deterministic checks. 🎉"
-            )
-        else:
-            explanation_parts = [
-                f"{COMMAND_REPLY_MARKER}\n",
-                f"### 🎓 JIAN Explanation for PR #{issue_number} (`{head_sha[:8]}`)\n\n",
-                f"> **Summary**: {review_result.summary}\n\n",
-                "Here is an in-depth explanation of the findings and recommended resolutions:\n\n",
-            ]
-            for i, finding in enumerate(review_result.findings, 1):
-                location = f"`{finding.file}:{finding.line}`" if finding.line else f"`{finding.file}`"
-                explanation_parts.append(
-                    f"#### {i}. {finding.severity.emoji} {finding.title} ({location})\n"
-                    f"- **Category**: `{finding.category.display_name}`\n"
-                    f"- **Why this matters**: {finding.description}\n"
-                )
-                if finding.suggested_fix:
-                    explanation_parts.append(
-                        f"- **Recommended Fix**:\n```python\n{finding.suggested_fix}\n```\n"
-                    )
-                explanation_parts.append("\n")
-
-            explanation_parts.append(
-                "---\n*To re-run the review after committing changes, reply with `@JIAN /review`.*"
-            )
-            reply = "".join(explanation_parts)
-
+        reply = self._build_explain_reply_from_findings(
+            review_result.findings, review_result.summary, head_sha, issue_number
+        )
         self.github_client.create_issue_comment(owner, repo, issue_number, reply)
         return {
             "status": "success",
             "command": "explain",
+            "source": "live_review",
             "findings_explained": len(review_result.findings),
         }
+
+    # ── helpers ────────────────────────────────────────────────────────────────
+
+    def _build_explain_reply_from_summary(
+        self,
+        summary_body: str,
+        owner: str,
+        repo: str,
+        issue_number: int,
+    ) -> str:
+        """Compose an /explain reply based on an existing JIAN summary comment body."""
+        # Determine severity from keywords present in the summary
+        body_lower = summary_body.lower()
+        has_blocking = any(
+            kw in body_lower
+            for kw in ("🔴", "🟠", "critical", "high", "request_changes", "request changes")
+        )
+        has_warnings = any(
+            kw in body_lower
+            for kw in ("🟡", "medium", "low", "warning")
+        )
+        no_findings = "no findings" in body_lower or "no issues" in body_lower or (
+            not has_blocking and not has_warnings
+            and "finding" not in body_lower
+            and "issue" not in body_lower
+        )
+
+        intro: str
+        if no_findings:
+            intro = (
+                "✅ The latest JIAN review found **no issues** in this Pull Request. "
+                "The changes adhere to clean code standards and pass all automated checks. 🎉"
+            )
+        elif has_blocking:
+            intro = (
+                "🔴 The latest JIAN review found **blocking findings** that should be "
+                "addressed before merging. See the detailed findings below."
+            )
+        else:
+            intro = (
+                "🟡 The latest JIAN review found **non-blocking warnings** (no blocking "
+                "defects). These are worth addressing but will not block the merge."
+            )
+
+        return (
+            f"{COMMAND_REPLY_MARKER}\n"
+            f"### 🎓 JIAN Explanation for PR #{issue_number}\n\n"
+            f"{intro}\n\n"
+            "---\n"
+            "**Latest JIAN Review Summary:**\n\n"
+            f"{summary_body}\n\n"
+            "---\n"
+            "*To re-run the review after committing new changes, reply with `@JIAN /review`.*"
+        )
+
+    def _build_explain_reply_from_findings(
+        self,
+        findings: list,
+        summary: str,
+        head_sha: str,
+        issue_number: int,
+    ) -> str:
+        """Compose an /explain reply from a list of ReviewFinding objects."""
+        if not findings:
+            return (
+                f"{COMMAND_REPLY_MARKER}\n"
+                "### 🎓 JIAN Explanation\n\n"
+                f"✅ No prior JIAN review exists, so I ran a live review of commit "
+                f"`{head_sha[:8]}` and found **no issues**. "
+                "The changes look clean. 🎉"
+            )
+
+        # Determine overall severity
+        severity_levels = [f.severity.level for f in findings]
+        max_level = max(severity_levels)
+        if max_level >= 4:  # HIGH or CRITICAL
+            verdict = "🔴 **Blocking findings detected** — these should be resolved before merging."
+        else:
+            verdict = "🟡 **Non-blocking warnings** — worth addressing but not blocking the merge."
+
+        parts = [
+            f"{COMMAND_REPLY_MARKER}\n",
+            f"### 🎓 JIAN Explanation for PR #{issue_number} (`{head_sha[:8]}`)\n\n",
+            f"> **Summary**: {summary}\n\n",
+            f"{verdict}\n\n",
+            "Here is an in-depth explanation of each finding:\n\n",
+        ]
+        for i, finding in enumerate(findings, 1):
+            location = f"`{finding.file}:{finding.line}`" if finding.line else f"`{finding.file}`"
+            parts.append(
+                f"#### {i}. {finding.severity.emoji} {finding.title} ({location})\n"
+                f"- **Category**: `{finding.category.display_name}`\n"
+                f"- **Why this matters**: {finding.description}\n"
+            )
+            if finding.suggested_fix:
+                parts.append(
+                    f"- **Recommended Fix**:\n```python\n{finding.suggested_fix}\n```\n"
+                )
+            parts.append("\n")
+
+        parts.append(
+            "---\n*To re-run the review after committing changes, reply with `@JIAN /review`.*"
+        )
+        return "".join(parts)

@@ -75,6 +75,36 @@ class GitHubClient:
         res.raise_for_status()
         return res.json()
 
+    def get_pr_review_summary_comment(
+        self, owner: str, repo: str, issue_number: int
+    ) -> str | None:
+        """Return the body of the most recent JIAN review summary comment, or None.
+
+        Searches PR/issue comments for the SUMMARY_MARKER sentinel and returns the
+        body of the last matching comment (most recent summary wins).
+        """
+        url = f"{self.base_url}/repos/{owner}/{repo}/issues/{issue_number}/comments"
+        page = 1
+        last_summary: str | None = None
+        while True:
+            try:
+                res = self.session.get(
+                    url, params={"page": page, "per_page": 100}, timeout=30
+                )
+                if res.status_code != 200:
+                    break
+                comments = res.json()
+                if not comments:
+                    break
+                for comment in comments:
+                    body = comment.get("body", "")
+                    if SUMMARY_MARKER in body:
+                        last_summary = body
+                page += 1
+            except Exception:
+                break
+        return last_summary
+
     def get_pull_request_files(
         self,
         owner: str,
