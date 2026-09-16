@@ -291,3 +291,266 @@ def test_service_process_pull_request_event(mock_get_files, mock_get_content):
     assert status == CheckStatusEnum.PASS
     assert mock_auth.get_installation_token.called
     assert mock_orchestrator.run_review.called
+
+
+def test_github_app_private_key_escaped_newlines(rsa_test_key_pem):
+    """Verify private key with literal \\n characters is properly normalized."""
+    escaped_pem = rsa_test_key_pem.replace("\n", "\\n")
+    auth = GitHubAppAuth(app_id="123", private_key=escaped_pem)
+    resolved = auth.get_private_key()
+    assert resolved == rsa_test_key_pem.strip()
+
+
+def test_github_app_private_key_base64(rsa_test_key_pem):
+    """Verify base64-encoded private key is properly decoded."""
+    import base64
+    b64_key = base64.b64encode(rsa_test_key_pem.encode("utf-8")).decode("utf-8")
+    auth = GitHubAppAuth(app_id="123", private_key=b64_key)
+    resolved = auth.get_private_key()
+    assert resolved == rsa_test_key_pem.strip()
+
+
+def test_github_app_private_key_missing_raises_error():
+    """Verify missing private key raises ValueError."""
+    auth = GitHubAppAuth(app_id="123", private_key=None)
+    with pytest.raises(ValueError, match="GitHub App private key is not configured"):
+        auth.get_private_key()
+
+
+@patch("requests.post")
+def test_github_app_token_multi_tenant_isolation(mock_post, rsa_test_key_pem):
+    """Verify tokens are isolated per installation ID and never cross-used."""
+    def fake_post(url, headers, timeout):
+        resp = MagicMock()
+        resp.status_code = 201
+        if "101" in url:
+            resp.json.return_value = {"token": "token_for_tenant_101"}
+        elif "202" in url:
+            resp.json.return_value = {"token": "token_for_tenant_202"}
+        else:
+            resp.json.return_value = {"token": "token_unknown"}
+        resp.raise_for_status.return_value = None
+        return resp
+
+    mock_post.side_effect = fake_post
+    auth = GitHubAppAuth(app_id="123", private_key=rsa_test_key_pem)
+
+    token_101 = auth.get_installation_token(101)
+    token_202 = auth.get_installation_token(202)
+
+    assert token_101 == "token_for_tenant_101"
+    assert token_202 == "token_for_tenant_202"
+    assert token_101 != token_202
+
+
+def test_webhook_delivery_cache_deduplication():
+    """Verify WebhookDeliveryCache detects duplicates and allows unique IDs."""
+    from ai_reviewer.app.webhook import WebhookDeliveryCache
+
+    cache = WebhookDeliveryCache(max_size=10, ttl_seconds=60)
+    del_id = "test-delivery-uuid-999"
+
+    assert cache.is_duplicate(del_id) is False
+    assert cache.is_duplicate(del_id) is True
+    assert cache.is_duplicate("different-uuid") is False
+    assert cache.is_duplicate(None) is False
+
+
+def test_webhook_delivery_header_deduplication_in_server():
+    """Verify FastAPI server rejects duplicate X-GitHub-Delivery requests."""
+    secret = "my_secret"
+    app = create_app(webhook_secret=secret)
+    client = TestClient(app)
+
+    payload = json.dumps({
+        "action": "opened",
+        "installation": {"id": 1},
+        "repository": {"name": "r", "owner": {"login": "o"}},
+        "pull_request": {"number": 1, "head": {"sha": "123"}},
+    }).encode("utf-8")
+    sig = "sha256=" + hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
+    headers = {
+        "X-GitHub-Event": "pull_request",
+        "X-Hub-Signature-256": sig,
+        "X-GitHub-Delivery": "delivery-fixed-uuid-1",
+    }
+
+    with patch("ai_reviewer.app.server.process_pull_request_event"):
+        # First request accepted
+        res1 = client.post("/webhooks/github", content=payload, headers=headers)
+        assert res1.status_code == 202
+        assert res1.json()["status"] == "accepted"
+
+        # Second request with identical delivery ID ignored as duplicate
+        res2 = client.post("/webhooks/github", content=payload, headers=headers)
+        assert res2.status_code == 202
+        assert res2.json()["status"] == "ignored"
+        assert res2.json()["reason"] == "duplicate_delivery"
+
+
+def test_webhook_issue_comment_parsing():
+    """Verify parsing and filtering of issue_comment events."""
+    handler = WebhookHandler(secret="secret")
+
+    valid_payload = {
+        "action": "created",
+        "installation": {"id": 9999},
+        "repository": {"name": "repo", "owner": {"login": "owner"}},
+        "issue": {"number": 15, "pull_request": {"url": "https://api.github.com/..."}},
+        "comment": {"id": 777, "body": "@JIAN /ping"},
+        "sender": {"login": "developer", "type": "User"},
+    }
+
+    # 1. Action: created on PR -> parsed
+    ev = handler.parse_issue_comment_event(valid_payload)
+    assert ev is not None
+    assert ev.action == "created"
+    assert ev.installation_id == 9999
+    assert ev.repo_owner == "owner"
+    assert ev.repo_name == "repo"
+    assert ev.issue_number == 15
+    assert ev.is_pull_request is True
+    assert ev.comment_body == "@JIAN /ping"
+
+    # 2. Action: edited -> ignored (None)
+    edited_payload = dict(valid_payload)
+    edited_payload["action"] = "edited"
+    assert handler.parse_issue_comment_event(edited_payload) is None
+
+    # 3. Missing installation -> None
+    no_inst = dict(valid_payload)
+    del no_inst["installation"]
+    assert handler.parse_issue_comment_event(no_inst) is None
+
+    # 4. Pure issue (not PR) -> is_pull_request is False
+    pure_issue_payload = dict(valid_payload)
+    pure_issue_payload["issue"] = {"number": 15}
+    ev_issue = handler.parse_issue_comment_event(pure_issue_payload)
+    assert ev_issue is not None
+    assert ev_issue.is_pull_request is False
+
+
+def test_fastapi_server_issue_comment_handling():
+    """Verify server receives issue_comment events and enqueues background processing."""
+    secret = "comment_secret"
+    app = create_app(webhook_secret=secret)
+    client = TestClient(app)
+
+    payload_dict = {
+        "action": "created",
+        "installation": {"id": 555},
+        "repository": {"name": "app-repo", "owner": {"login": "org"}},
+        "issue": {"number": 20, "pull_request": {"url": "https://api.github.com/..."}},
+        "comment": {"id": 888, "body": "@JIAN /ping", "user": {"login": "human", "type": "User"}},
+        "sender": {"login": "human", "type": "User"},
+    }
+    payload_bytes = json.dumps(payload_dict).encode("utf-8")
+    sig = "sha256=" + hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
+
+    with patch("ai_reviewer.app.server.process_issue_comment_event") as mock_comment_task:
+        res = client.post(
+            "/webhooks/github",
+            content=payload_bytes,
+            headers={
+                "X-GitHub-Event": "issue_comment",
+                "X-Hub-Signature-256": sig,
+                "X-GitHub-Delivery": "delivery-comment-1",
+            },
+        )
+        assert res.status_code == 202
+        data = res.json()
+        assert data["status"] == "accepted"
+        assert data["event"] == "issue_comment"
+        assert data["comment_id"] == 888
+        assert mock_comment_task.called
+
+
+def test_fastapi_server_ignores_bot_issue_comment():
+    """Verify bot-authored comments are ignored immediately to prevent loops."""
+    secret = "comment_secret"
+    app = create_app(webhook_secret=secret)
+    client = TestClient(app)
+
+    payload_dict = {
+        "action": "created",
+        "installation": {"id": 555},
+        "repository": {"name": "app-repo", "owner": {"login": "org"}},
+        "issue": {"number": 20, "pull_request": {"url": "https://api.github.com/..."}},
+        "comment": {"id": 889, "body": "Bot reply", "user": {"login": "github-actions[bot]", "type": "Bot"}},
+        "sender": {"login": "github-actions[bot]", "type": "Bot"},
+    }
+    payload_bytes = json.dumps(payload_dict).encode("utf-8")
+    sig = "sha256=" + hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
+
+    res = client.post(
+        "/webhooks/github",
+        content=payload_bytes,
+        headers={
+            "X-GitHub-Event": "issue_comment",
+            "X-Hub-Signature-256": sig,
+            "X-GitHub-Delivery": "delivery-bot-comment-1",
+        },
+    )
+    assert res.status_code == 202
+    assert res.json()["status"] == "ignored"
+    assert res.json()["reason"] == "bot_comment"
+
+
+def test_service_process_issue_comment_event():
+    """Verify process_issue_comment_event dispatches command using scoped client."""
+    from ai_reviewer.app.service import process_issue_comment_event
+    from ai_reviewer.app.webhook import WebhookIssueCommentEvent
+
+    event = WebhookIssueCommentEvent(
+        action="created",
+        installation_id=777,
+        repo_owner="test-owner",
+        repo_name="test-repo",
+        issue_number=10,
+        is_pull_request=True,
+        comment_id=1234,
+        comment_body="@JIAN /ping",
+        sender_login="dev",
+        sender_type="User",
+        raw_payload={
+            "comment": {"id": 1234, "body": "@JIAN /ping", "user": {"login": "dev", "type": "User"}},
+            "issue": {"number": 10, "pull_request": {"url": "..."}},
+            "repository": {"full_name": "test-owner/test-repo"},
+            "sender": {"login": "dev", "type": "User"},
+        },
+    )
+
+    mock_auth = MagicMock()
+    mock_auth.get_installation_token.return_value = "ghs_scoped_token"
+
+    mock_dispatcher = MagicMock()
+    mock_dispatcher.handle_event.return_value = {"status": "success", "command": "ping"}
+
+    result = process_issue_comment_event(
+        event=event,
+        auth=mock_auth,
+        dispatcher_override=mock_dispatcher,
+    )
+
+    assert result == {"status": "success", "command": "ping"}
+    mock_auth.get_installation_token.assert_called_once_with(777)
+    mock_dispatcher.handle_event.assert_called_once()
+
+
+def test_server_malformed_json_returns_400():
+    """Verify invalid JSON payloads return 400 Bad Request."""
+    secret = "sec"
+    app = create_app(webhook_secret=secret)
+    client = TestClient(app)
+
+    broken_body = b"{not-valid-json"
+    sig = "sha256=" + hmac.new(secret.encode("utf-8"), broken_body, hashlib.sha256).hexdigest()
+
+    res = client.post(
+        "/webhooks/github",
+        content=broken_body,
+        headers={"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": sig},
+    )
+    assert res.status_code == 400
+    assert "Malformed JSON payload" in res.json()["detail"]
+

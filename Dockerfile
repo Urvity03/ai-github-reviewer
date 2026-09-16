@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# Install git for diff parsing
+# Install git for diff parsing and curl for healthchecks
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git ca-certificates && \
+    apt-get install -y --no-install-recommends git curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
@@ -32,6 +32,10 @@ USER reviewer
 
 # Expose default webhook server port
 EXPOSE 8000
+
+# Container healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Default entrypoint to start webhook server
 ENTRYPOINT ["ai-reviewer"]

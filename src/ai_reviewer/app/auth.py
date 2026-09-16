@@ -20,26 +20,50 @@ class GitHubAppAuth:
         private_key: str | None = None,
         base_url: str = "https://api.github.com",
     ):
-        self.app_id = str(app_id or os.getenv("GITHUB_APP_ID", ""))
+        self.app_id = str(app_id or os.getenv("GITHUB_APP_ID", "")).strip()
         self.base_url = base_url.rstrip("/")
-        self._raw_private_key = private_key or os.getenv("GITHUB_APP_PRIVATE_KEY")
+        self._raw_private_key = (
+            private_key
+            or os.getenv("GITHUB_PRIVATE_KEY")
+            or os.getenv("GITHUB_APP_PRIVATE_KEY")
+        )
         self._private_key_path = os.getenv("GITHUB_APP_PRIVATE_KEY_PATH")
         # In-memory token cache: installation_id -> (token, expires_at_timestamp)
         self._token_cache: dict[int, tuple[str, float]] = {}
 
     def get_private_key(self) -> str:
-        """Resolve private key from raw string, environment, or file path."""
+        """Resolve private key from raw string, environment, or file path, normalizing format."""
+        raw_key: str | None = None
         if self._raw_private_key:
-            return self._raw_private_key.strip()
-        if self._private_key_path:
+            raw_key = self._raw_private_key.strip()
+        elif self._private_key_path:
             p = Path(self._private_key_path)
             if p.is_file():
-                return p.read_text(encoding="utf-8").strip()
-            raise FileNotFoundError(f"GitHub App private key file not found: {self._private_key_path}")
-        raise ValueError(
-            "GitHub App private key is not configured. "
-            "Set GITHUB_APP_PRIVATE_KEY or GITHUB_APP_PRIVATE_KEY_PATH."
-        )
+                raw_key = p.read_text(encoding="utf-8").strip()
+            else:
+                raise FileNotFoundError(f"GitHub App private key file not found: {self._private_key_path}")
+
+        if not raw_key:
+            raise ValueError(
+                "GitHub App private key is not configured. "
+                "Set GITHUB_PRIVATE_KEY, GITHUB_APP_PRIVATE_KEY, or GITHUB_APP_PRIVATE_KEY_PATH."
+            )
+
+        # Handle escaped newlines (e.g. \\n from environment variables)
+        if "\\n" in raw_key:
+            raw_key = raw_key.replace("\\n", "\n")
+
+        # Handle base64 encoded private key if not starting with PEM header
+        if not raw_key.startswith("-----BEGIN"):
+            import base64
+            try:
+                decoded = base64.b64decode(raw_key).decode("utf-8")
+                if "-----BEGIN" in decoded:
+                    raw_key = decoded.strip()
+            except Exception:
+                pass
+
+        return raw_key.strip()
 
     def create_jwt(self, expiration_seconds: int = 540) -> str:
         """

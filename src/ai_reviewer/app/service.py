@@ -1,11 +1,11 @@
-"""Background review execution service for GitHub App pull request webhook events."""
-
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from ai_reviewer.app.auth import GitHubAppAuth
-from ai_reviewer.app.webhook import WebhookPREvent
+from ai_reviewer.app.webhook import WebhookIssueCommentEvent, WebhookPREvent
+from ai_reviewer.commands import CommandDispatcher
 from ai_reviewer.config import AppConfig, load_config, load_config_from_yaml
 from ai_reviewer.context import ContextBuilder
 from ai_reviewer.github_client import GitHubClient
@@ -116,4 +116,79 @@ def process_pull_request_event(
         return result, status
     except Exception as err:
         logger.error("Error during review execution for PR #%d: %s", pr_num, err)
+        return None
+
+
+def process_issue_comment_event(
+    event: WebhookIssueCommentEvent,
+    auth: GitHubAppAuth | None = None,
+    custom_config: AppConfig | None = None,
+    orchestrator_override: ReviewOrchestrator | None = None,
+    dispatcher_override: CommandDispatcher | None = None,
+) -> dict[str, Any] | None:
+    """
+    Process a GitHub App issue_comment event:
+    1. Obtains short-lived installation access token for the installation.
+    2. Instantiates GitHubClient with that scoped installation token.
+    3. Builds ReviewOrchestrator and CommandDispatcher with the scoped client.
+    4. Dispatches the command (/ping, /help, /review, /explain).
+    """
+    owner = event.repo_owner
+    repo = event.repo_name
+    issue_num = event.issue_number
+
+    logger.info(
+        "Processing issue_comment event for %s/%s #%d (comment %d) by @%s",
+        owner,
+        repo,
+        issue_num,
+        event.comment_id,
+        event.sender_login,
+    )
+
+    # 1. Obtain installation access token
+    token = None
+    if auth:
+        try:
+            token = auth.get_installation_token(event.installation_id)
+        except Exception as err:
+            logger.error(
+                "Failed to obtain installation token for installation %d: %s",
+                event.installation_id,
+                err,
+            )
+            return None
+
+    gh_client = GitHubClient(token=token)
+    app_config = custom_config or load_config()
+
+    orchestrator = orchestrator_override or ReviewOrchestrator(
+        config=app_config,
+        github_client=gh_client,
+    )
+
+    dispatcher = dispatcher_override or CommandDispatcher(
+        config=app_config,
+        github_client=gh_client,
+        orchestrator=orchestrator,
+    )
+
+    try:
+        result = dispatcher.handle_event(event.raw_payload)
+        logger.info(
+            "Command processing completed for %s/%s #%d: %s",
+            owner,
+            repo,
+            issue_num,
+            result,
+        )
+        return result
+    except Exception as err:
+        logger.error(
+            "Error during command execution for %s/%s #%d: %s",
+            owner,
+            repo,
+            issue_num,
+            err,
+        )
         return None

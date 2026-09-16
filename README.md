@@ -6,33 +6,41 @@ Reusable across repositories such as **WEGOTCHU**, **VeriMediaAI**, and any Pyth
 
 ---
 
-## 1. What It Does
+## 1. What It Does & Deployment Modes
 
+JIAN 鉴 operates in two production-tested modes:
+
+### Mode A: Public GitHub App (Recommended — Zero User Configuration)
+```text
+GitHub User / Org
+       ↓
+Install JIAN App (Select repositories)
+       ↓
+GitHub sends Webhooks (POST /webhooks/github)
+       ↓
+JIAN Backend verifies HMAC-SHA256 signature & dedups delivery
+       ↓
+Generates scoped installation access token (Zero PAT required)
+       ↓
+Executes deterministic checks & Gemini Free Tier review
+       ↓
+Publishes inline annotations, summary comment, & Check Run status
+       ↓
+User mentions @JIAN /review, @JIAN /explain, etc.
+```
+
+*Users do NOT need to copy workflows into their repositories, create personal access tokens (PATs), or configure secrets on customer repositories.*
+
+### Mode B: GitHub Actions Workflow (Self-Hosted CI)
 ```text
 Developer creates branch & pushes code
         ↓
-Opens Pull Request on GitHub
+GitHub Actions triggers `ai-review.yml`
         ↓
-GitHub Actions triggers `ai-review.yml` automatically
-        ↓
-Bot collects PR metadata, diffs, and repository context
-        ↓
-Runs deterministic checks (Syntax, Secrets, Ruff, Pytest)
-        ↓
-AI Reviewer analyzes changes (Security, Correctness, ML, Domain rules)
-        ↓
-Anti-Hallucination engine validates findings against diff hunks
-        ↓
-Bot posts inline comments on affected PR lines
-        ↓
-Bot posts / updates a single formatted summary comment
-        ↓
-GitHub Check Run status updated (PASS, WARN, FAIL, ERROR)
-        ↓
-Developer pushes new commits
-        ↓
-Bot automatically re-reviews updated commits and resolves comments
+Executes review pipeline directly on the Actions runner
 ```
+
+See [docs/github_app_setup.md](docs/github_app_setup.md) for the complete GitHub App setup and deployment guide.
 
 ---
 

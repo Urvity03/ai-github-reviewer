@@ -89,14 +89,33 @@ def doctor() -> None:
     else:
         table.add_row("GITHUB_TOKEN", "[dim]NOT SET[/dim]", "Optional locally. Required for PR posting in GitHub Actions.")
 
-    # 5. Configuration file
+    # 5. GitHub App Settings (for standalone App / Webhook server)
+    app_id = os.getenv("GITHUB_APP_ID")
+    app_key = os.getenv("GITHUB_PRIVATE_KEY") or os.getenv("GITHUB_APP_PRIVATE_KEY") or os.getenv("GITHUB_APP_PRIVATE_KEY_PATH")
+    wh_secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+    if app_id:
+        table.add_row("GITHUB_APP_ID", "[green]CONFIGURED[/green]", f"App ID: {app_id}")
+    else:
+        table.add_row("GITHUB_APP_ID", "[dim]NOT SET[/dim]", "Optional for Actions; required for GitHub App")
+
+    if app_key:
+        table.add_row("GITHUB_PRIVATE_KEY", "[green]CONFIGURED[/green]", "Private key is configured")
+    else:
+        table.add_row("GITHUB_PRIVATE_KEY", "[dim]NOT SET[/dim]", "Optional for Actions; required for GitHub App")
+
+    if wh_secret:
+        table.add_row("GITHUB_WEBHOOK_SECRET", "[green]CONFIGURED[/green]", "Secret is configured")
+    else:
+        table.add_row("GITHUB_WEBHOOK_SECRET", "[dim]NOT SET[/dim]", "Optional for Actions; required for Webhook verification")
+
+    # 6. Configuration file
     config_file = Path(".ai-reviewer.yml")
     if config_file.is_file():
         table.add_row("Repository Config", "[green]FOUND[/green]", ".ai-reviewer.yml present")
     else:
         table.add_row("Repository Config", "[dim]DEFAULT[/dim]", "No .ai-reviewer.yml found; using production defaults")
 
-    # 6. Optional Tools
+    # 7. Optional Tools
     for tool_name in ["ruff", "pytest", "docker"]:
         tool_path = shutil.which(tool_name)
         status_str = "[green]AVAILABLE[/green]" if tool_path else "[dim]NOT FOUND[/dim]"

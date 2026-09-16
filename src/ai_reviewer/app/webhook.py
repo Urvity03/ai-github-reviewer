@@ -5,9 +5,50 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import threading
+import time
+from collections import OrderedDict
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+class WebhookDeliveryCache:
+    """Thread-safe LRU/TTL cache to track recent X-GitHub-Delivery IDs and prevent duplicates."""
+
+    def __init__(self, max_size: int = 10000, ttl_seconds: float = 3600.0):
+        self.max_size = max_size
+        self.ttl_seconds = ttl_seconds
+        self._cache: OrderedDict[str, float] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def is_duplicate(self, delivery_id: str | None) -> bool:
+        """Return True if delivery_id was recently seen; otherwise record it and return False."""
+        if not delivery_id:
+            return False
+        now = time.time()
+        with self._lock:
+            # Prune expired entries from the front of OrderedDict
+            while self._cache:
+                oldest_id, timestamp = next(iter(self._cache.items()))
+                if now - timestamp > self.ttl_seconds:
+                    self._cache.popitem(last=False)
+                else:
+                    break
+
+            if delivery_id in self._cache:
+                return True
+
+            if len(self._cache) >= self.max_size:
+                self._cache.popitem(last=False)
+
+            self._cache[delivery_id] = now
+            return False
+
+    def clear(self) -> None:
+        """Clear cache (primarily for test resets)."""
+        with self._lock:
+            self._cache.clear()
 
 
 class WebhookPREvent(BaseModel):
@@ -28,8 +69,24 @@ class WebhookPREvent(BaseModel):
     raw_payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class WebhookIssueCommentEvent(BaseModel):
+    """Structured representation of an issue_comment webhook event."""
+
+    action: str
+    installation_id: int
+    repo_owner: str
+    repo_name: str
+    issue_number: int
+    is_pull_request: bool
+    comment_id: int
+    comment_body: str
+    sender_login: str = ""
+    sender_type: str = ""
+    raw_payload: dict[str, Any] = Field(default_factory=dict)
+
+
 class WebhookHandler:
-    """Handles GitHub webhook signature verification and pull_request event parsing."""
+    """Handles GitHub webhook signature verification and event parsing."""
 
     SUPPORTED_PR_ACTIONS = {"opened", "synchronize", "reopened", "ready_for_review"}
 
@@ -59,7 +116,7 @@ class WebhookHandler:
     def parse_pull_request_event(self, payload: dict[str, Any]) -> WebhookPREvent | None:
         """
         Parse and filter a pull_request webhook payload.
-        Returns WebhookPREvent if actionable, or None if the event should be ignored (e.g. draft PR or unsupported action).
+        Returns WebhookPREvent if actionable, or None if the event should be ignored.
         """
         action = payload.get("action")
         if action not in self.SUPPORTED_PR_ACTIONS:
@@ -104,5 +161,53 @@ class WebhookHandler:
             head_sha=head_sha,
             is_draft=is_draft,
             sender_login=payload.get("sender", {}).get("login", ""),
+            raw_payload=payload,
+        )
+
+    def parse_issue_comment_event(self, payload: dict[str, Any]) -> WebhookIssueCommentEvent | None:
+        """
+        Parse and filter an issue_comment webhook payload.
+        Only action="created" is supported.
+        Returns WebhookIssueCommentEvent if actionable, or None if ignored.
+        """
+        action = payload.get("action")
+        if action != "created":
+            return None
+
+        comment = payload.get("comment")
+        if not comment:
+            return None
+
+        issue = payload.get("issue")
+        if not issue:
+            return None
+
+        is_pr = "pull_request" in issue and bool(issue["pull_request"])
+
+        installation = payload.get("installation")
+        if not installation or "id" not in installation:
+            return None
+        installation_id = installation["id"]
+
+        repo = payload.get("repository", {})
+        owner_info = repo.get("owner", {})
+        owner = owner_info.get("login") or owner_info.get("name") or ""
+        repo_name = repo.get("name") or ""
+        if not owner or not repo_name:
+            return None
+
+        sender = payload.get("sender", {})
+
+        return WebhookIssueCommentEvent(
+            action=action,
+            installation_id=installation_id,
+            repo_owner=owner,
+            repo_name=repo_name,
+            issue_number=issue.get("number", 0),
+            is_pull_request=is_pr,
+            comment_id=comment.get("id", 0),
+            comment_body=comment.get("body", "") or "",
+            sender_login=sender.get("login", ""),
+            sender_type=sender.get("type", ""),
             raw_payload=payload,
         )
