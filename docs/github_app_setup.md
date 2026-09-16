@@ -10,13 +10,27 @@ This guide walks you through registering, configuring, and deploying **JIAN 鉴*
    - Personal account: **GitHub Settings** → **Developer Settings** → **GitHub Apps** → **New GitHub App**
    - Organization: **Organization Settings** → **Developer Settings** → **GitHub Apps** → **New GitHub App**
 2. Fill in **Basic Information**:
-   - **GitHub App name**: `JIAN 鉴 — AI Code Reviewer` (or your preferred unique name)
-   - **Homepage URL**: `https://github.com/Urvity03/ai-github-reviewer` (or your service homepage)
-3. Configure **Webhook**:
+   - **GitHub App name**: `JIAN 鉴` (or `JIAN 鉴 — AI Code Reviewer` if the short name is taken in your scope)
+   - **Homepage URL**: `https://github.com/Urvity03/ai-github-reviewer`
+   - **Description**: `AI-powered GitHub Pull Request Reviewer`
+3. Upload **App Avatar (Profile Picture)**:
+   - Click **Upload a logo...** and select `assets/jian_avatar.png` (candidate avatar).
+   - > [!WARNING]
+   > **Candidate Avatar Licensing Notice**: The candidate test avatar depicts Gian (Takeshi Gouda) from *Doraemon* (© Fujiko F. Fujio / Shogakukan). While suitable for internal and controlled testing, an original custom mascot must replace it prior to broad commercial/public distribution.
+4. Configure **Webhook**:
    - **Active**: Check `[x] Active`
    - **Webhook URL**: `https://<your-domain>/webhooks/github` (or your tunneling URL for local dev)
    - **Webhook secret**: Generate a cryptographically secure random string (e.g., `openssl rand -hex 32`) and save it.
    - **SSL verification**: Select `Enable SSL verification` (mandatory in production).
+
+---
+
+## 1.1 Automated Registration via GitHub App Manifest
+
+Alternatively, you can create the App with all permissions and events pre-filled using `app.manifest.json`:
+1. Open the [app.manifest.json](../app.manifest.json) file.
+2. Replace `YOUR-DEPLOYED-DOMAIN` with your actual public HTTPS domain.
+3. Submit the manifest to GitHub via the GitHub App Manifest flow to register in one click.
 
 ---
 

@@ -23,6 +23,9 @@ def test_command_parsing():
     # Ping variants
     assert parse_command("@JIAN /ping") == "ping"
     assert parse_command("@jian /ping") == "ping"
+    assert parse_command("@jian-jian /ping") == "ping"
+    assert parse_command("@jian-jian[bot] /ping") == "ping"
+    assert parse_command("@jian-ai-reviewer /ping") == "ping"
     assert parse_command("@JIAN ping") == "ping"
     assert parse_command("/ping") == "ping"
     assert parse_command("@ai-reviewer /ping") == "ping"
@@ -30,18 +33,21 @@ def test_command_parsing():
     # Help variants
     assert parse_command("@JIAN /help") == "help"
     assert parse_command("@jian /help") == "help"
+    assert parse_command("@jian-app /help") == "help"
     assert parse_command("@JIAN help") == "help"
     assert parse_command("/help") == "help"
 
     # Review variants
     assert parse_command("@JIAN /review") == "review"
     assert parse_command("@jian /review") == "review"
+    assert parse_command("@jian-jian[bot] /review") == "review"
     assert parse_command("@JIAN review") == "review"
     assert parse_command("/review") == "review"
 
     # Explain variants
     assert parse_command("@JIAN /explain") == "explain"
     assert parse_command("@jian /explain") == "explain"
+    assert parse_command("@jian-jian /explain") == "explain"
     assert parse_command("@JIAN explain") == "explain"
     assert parse_command("/explain") == "explain"
 

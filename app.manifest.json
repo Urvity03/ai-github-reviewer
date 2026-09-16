@@ -1,0 +1,22 @@
+{
+  "name": "JIAN 鉴",
+  "url": "https://github.com/Urvity03/ai-github-reviewer",
+  "hook_attributes": {
+    "url": "https://YOUR-DEPLOYED-DOMAIN/webhooks/github",
+    "active": true
+  },
+  "public": true,
+  "default_permissions": {
+    "contents": "read",
+    "metadata": "read",
+    "pull_requests": "write",
+    "issues": "write",
+    "checks": "write",
+    "statuses": "write"
+  },
+  "default_events": [
+    "pull_request",
+    "issue_comment"
+  ],
+  "description": "AI-powered GitHub Pull Request Reviewer"
+}

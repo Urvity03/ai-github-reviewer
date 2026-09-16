@@ -41,7 +41,7 @@ def parse_command(text: str) -> str | None:
 
     first_line = cleaned.splitlines()[0].strip()
     match = re.match(
-        r"^(?:@(?:jian|ai-reviewer|bot)\s+)?/?(ping|help|review|explain)(?:\s+.*)?$",
+        r"^(?:@(?:jian[\w\-\[\]]*|ai-reviewer[\w\-\[\]]*|bot)\s+)?/?(ping|help|review|explain)(?:\s+.*)?$",
         first_line,
         re.IGNORECASE,
     )
