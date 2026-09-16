@@ -130,7 +130,7 @@ To use this bot in any repository (e.g. WEGOTCHU, VeriMediaAI, etc.):
 Copy `.github/workflows/ai-review.yml` into your repository:
 
 ```yaml
-name: AI Pull Request Review
+name: AI Pull Request Review & Commands
 
 on:
   pull_request:
@@ -139,9 +139,12 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+  issue_comment:
+    types:
+      - created
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 permissions:
@@ -152,9 +155,14 @@ permissions:
   issues: write
 
 jobs:
-  ai-review:
-    name: AI PR Code Review
-    if: github.event.pull_request.draft == false
+  ai-reviewer-dispatch:
+    name: AI PR Code Review & Commands
+    if: >
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && github.event.comment.user.type != 'Bot' &&
+       (contains(github.event.comment.body, '@JIAN') || contains(github.event.comment.body, '@jian') ||
+        contains(github.event.comment.body, '/ping') || contains(github.event.comment.body, '/help') ||
+        contains(github.event.comment.body, '/review') || contains(github.event.comment.body, '/explain')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -175,23 +183,68 @@ jobs:
         run: |
           ai-reviewer doctor
 
-      - name: Run Review
+      - name: Execute Review or Command Dispatch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref || '' }}
         run: |
-          ai-reviewer review
+          ai-reviewer dispatch
 ```
 
 ---
 
-## 6. Repository Configuration (`.ai-reviewer.yml`)
+## 6. Interactive Bot Commands
+
+Team members can interact with JIAN directly in GitHub Pull Request and Issue discussions by mentioning `@JIAN` with any of the following slash commands:
+
+### Available Commands
+
+| Command | Supported Scope | Description |
+| :--- | :--- | :--- |
+| **`@JIAN /ping`** | Issues & PRs | Checks whether JIAN is online, healthy, and operational. |
+| **`@JIAN /help`** | Issues & PRs | Displays a help menu of available commands and usage instructions. |
+| **`@JIAN /review`** | Pull Requests only | Triggers a fresh, full automated AI code review on the latest commit. |
+| **`@JIAN /explain`** | Pull Requests only | Explains current code review findings and suggestions in plain language. |
+
+### Command Examples & Usage
+
+#### 1. Check Bot Status
+```markdown
+@JIAN /ping
+```
+> 🏓 **Pong!** JIAN AI Code Reviewer is online, healthy, and ready to assist.
+> *Provider:* `gemini` (`gemini-3.6-flash`)
+
+#### 2. Get Help
+```markdown
+@JIAN /help
+```
+> Displays the full interactive command reference table.
+
+#### 3. Trigger Manual Re-Review
+```markdown
+@JIAN /review
+```
+> 🚀 **Review Triggered via Command!** Successfully evaluated commit `b4a9f5a0`. Check summary and annotations above.
+
+#### 4. Educational Finding Explanation
+```markdown
+@JIAN /explain
+```
+> ### 🎓 JIAN Explanation for PR #1 (`b4a9f5a0`)
+> Explains why each flagged defect matters, architectural impact, and how to apply recommended code fixes.
+
+---
+
+## 7. Repository Configuration (`.ai-reviewer.yml`)
 
 Place an `.ai-reviewer.yml` in the root of your repository to customize review behavior:
 

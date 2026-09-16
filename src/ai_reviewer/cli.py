@@ -282,6 +282,46 @@ def review(
         raise typer.Exit(code=1)
 
 
+@app.command(name="handle-comment")
+def handle_comment(
+    event_path: Path | None = typer.Option(
+        None,
+        "--event-path",
+        "-e",
+        help="Path to GitHub Actions event payload JSON file ($GITHUB_EVENT_PATH).",
+    ),
+) -> None:
+    """Process an issue_comment event payload and dispatch JIAN interactive commands."""
+    from ai_reviewer.commands import CommandDispatcher
+
+    path_str = os.getenv("GITHUB_EVENT_PATH")
+    path = event_path or (Path(path_str) if path_str else None)
+    if not path or not path.is_file():
+        console.print("[red]Error: GITHUB_EVENT_PATH not set or file does not exist.[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            event_payload = json.load(f)
+    except Exception as err:
+        console.print(f"[red]Error parsing event JSON: {err}[/red]")
+        raise typer.Exit(code=1)
+
+    dispatcher = CommandDispatcher()
+    res = dispatcher.handle_event(event_payload)
+    console.print(f"[green]Command processing result: {res}[/green]")
+
+
+@app.command()
+def dispatch() -> None:
+    """Automatically detect event type from GITHUB_EVENT_NAME and execute review or command."""
+    event_name = os.getenv("GITHUB_EVENT_NAME", "pull_request")
+    if event_name == "issue_comment":
+        handle_comment(None)
+    else:
+        review()
+
+
 @app.command()
 def serve(
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind server to"),
@@ -301,3 +341,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

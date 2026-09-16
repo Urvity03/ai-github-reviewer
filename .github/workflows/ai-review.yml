@@ -1,4 +1,4 @@
-name: AI Pull Request Review
+name: AI Pull Request Review & Commands
 
 on:
   pull_request:
@@ -7,13 +7,16 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+  issue_comment:
+    types:
+      - created
 
-# Prevent duplicate / concurrent runs on the same PR when fast pushes happen
+# Prevent duplicate / concurrent runs on the same PR when fast pushes or multiple comments happen
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
-# Minimum required permissions for GITHUB_TOKEN
+# Minimum required permissions for GITHUB_TOKEN to review PRs and reply to comments
 permissions:
   contents: read
   pull-requests: write
@@ -22,10 +25,15 @@ permissions:
   issues: write
 
 jobs:
-  ai-review:
-    name: AI PR Code Review
-    # Don't run on draft PRs unless marked ready_for_review
-    if: github.event.pull_request.draft == false
+  ai-reviewer-dispatch:
+    name: AI PR Code Review & Commands
+    # Only run on ready pull requests or non-bot issue/PR comments mentioning commands
+    if: >
+      (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
+      (github.event_name == 'issue_comment' && github.event.comment.user.type != 'Bot' &&
+       (contains(github.event.comment.body, '@JIAN') || contains(github.event.comment.body, '@jian') ||
+        contains(github.event.comment.body, '/ping') || contains(github.event.comment.body, '/help') ||
+        contains(github.event.comment.body, '/review') || contains(github.event.comment.body, '/explain')))
     runs-on: ubuntu-latest
 
     steps:
@@ -51,15 +59,17 @@ jobs:
         run: |
           ai-reviewer doctor
 
-      - name: Execute AI Code Review
+      - name: Execute Review or Command Dispatch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.6-flash' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref || '' }}
+          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref || '' }}
         run: |
-          ai-reviewer review
+          ai-reviewer dispatch

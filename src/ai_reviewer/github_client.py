@@ -52,10 +52,26 @@ class GitHubClient:
         except Exception:
             return None
 
+    def get_issue(self, owner: str, repo: str, issue_number: int) -> dict[str, Any]:
+        """Fetch issue metadata."""
+        url = f"{self.base_url}/repos/{owner}/{repo}/issues/{issue_number}"
+        res = self.session.get(url, timeout=30)
+        res.raise_for_status()
+        return res.json()
+
     def get_pull_request(self, owner: str, repo: str, pull_number: int) -> dict[str, Any]:
         """Fetch pull request metadata."""
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
         res = self.session.get(url, timeout=30)
+        res.raise_for_status()
+        return res.json()
+
+    def create_issue_comment(
+        self, owner: str, repo: str, issue_number: int, body: str
+    ) -> dict[str, Any]:
+        """Post a comment to an issue or pull request discussion."""
+        url = f"{self.base_url}/repos/{owner}/{repo}/issues/{issue_number}/comments"
+        res = self.session.post(url, json={"body": body}, timeout=30)
         res.raise_for_status()
         return res.json()
 
