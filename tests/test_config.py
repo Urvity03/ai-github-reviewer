@@ -10,7 +10,7 @@ def test_default_config():
     cfg = AppConfig()
     assert cfg.review.enabled is True
     assert cfg.review.provider == "gemini"
-    assert cfg.review.model == "gemini-2.5-flash"
+    assert cfg.review.model == "gemini-2.0-flash"
     assert SeverityEnum.CRITICAL in cfg.severity.fail_on
     assert SeverityEnum.HIGH in cfg.severity.fail_on
     assert cfg.rules.correctness is True
