@@ -9,9 +9,6 @@
 
 It combines **deterministic static checks** (AST parsing, Python compilation, secret scanning, Ruff linting, pytest discovery) with **Google Gemini Free Tier** analysis, **anti-hallucination line verification**, and an **interactive bot command interface**.
 
-<p align="center">
-  <img src="assets/jian_avatar.png" width="160" alt="JIAN 鉴 Logo" style="border-radius: 50%;">
-</p>
 
 ---
 
