@@ -66,13 +66,20 @@ def doctor() -> None:
     else:
         table.add_row("Git Installation", "[red]FAIL[/red]", "Git not found in PATH")
 
-    # 3. OpenAI API Key presence
+    # 3. AI Provider Keys (Gemini default, OpenAI optional)
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        masked_key = gemini_key[:3] + "..." + gemini_key[-4:] if len(gemini_key) > 8 else "***"
+        table.add_row("GEMINI_API_KEY (Default)", "[green]CONFIGURED[/green]", f"Key present ({masked_key})")
+    else:
+        table.add_row("GEMINI_API_KEY (Default)", "[yellow]NOT SET[/yellow]", "Required for Free Tier Gemini AI reviews. Export GEMINI_API_KEY.")
+
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
-        masked_key = openai_key[:3] + "..." + openai_key[-4:] if len(openai_key) > 8 else "***"
-        table.add_row("OPENAI_API_KEY", "[green]CONFIGURED[/green]", f"Key present ({masked_key})")
+        masked_open = openai_key[:3] + "..." + openai_key[-4:] if len(openai_key) > 8 else "***"
+        table.add_row("OPENAI_API_KEY (Optional)", "[green]CONFIGURED[/green]", f"Key present ({masked_open})")
     else:
-        table.add_row("OPENAI_API_KEY", "[yellow]NOT SET[/yellow]", "Required for AI reviews. Export OPENAI_API_KEY.")
+        table.add_row("OPENAI_API_KEY (Optional)", "[dim]NOT SET[/dim]", "Optional alternative provider.")
 
     # 4. GitHub Token presence
     gh_token = os.getenv("GITHUB_TOKEN")

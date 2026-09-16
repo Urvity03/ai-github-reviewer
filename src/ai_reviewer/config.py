@@ -56,8 +56,8 @@ DEFAULT_EXCLUDED_PATTERNS = [
 class ReviewConfigSection(BaseModel):
     enabled: bool = True
     language: str = "auto"
-    provider: str = "openai"
-    model: str = "gpt-4o"
+    provider: str = "gemini"
+    model: str = "gemini-2.5-flash"
     temperature: float = 0.1
     confidence_threshold: float = 0.7
 

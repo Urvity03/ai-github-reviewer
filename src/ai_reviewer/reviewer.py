@@ -20,6 +20,7 @@ from ai_reviewer.models.review import (
     SeverityEnum,
 )
 from ai_reviewer.providers.base import AIReviewer
+from ai_reviewer.providers.gemini import GeminiReviewer
 from ai_reviewer.providers.openai import OpenAIReviewer
 from ai_reviewer.rules import build_system_prompt, build_user_prompt
 from ai_reviewer.static_analysis import run_all_deterministic_checks
@@ -47,9 +48,11 @@ class ReviewOrchestrator:
         if self.provider:
             return self.provider
         prov_name = self.config.review.provider.lower()
-        if prov_name == "openai":
+        if prov_name == "gemini":
+            return GeminiReviewer(self.config)
+        elif prov_name == "openai":
             return OpenAIReviewer(self.config)
-        raise ValueError(f"Unsupported AI provider: {prov_name}. Supported providers: ['openai']")
+        raise ValueError(f"Unsupported AI provider: {prov_name}. Supported providers: ['gemini', 'openai']")
 
     def run_review(
         self,

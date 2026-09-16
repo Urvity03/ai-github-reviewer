@@ -20,7 +20,7 @@ def test_cli_config():
     result = runner.invoke(app, ["config"])
     assert result.exit_code == 0
     assert "Active AI Reviewer Configuration" in result.stdout
-    assert "openai" in result.stdout
+    assert "gemini" in result.stdout
 
 
 def test_cli_review_file_dry_run(tmp_path: Path):
