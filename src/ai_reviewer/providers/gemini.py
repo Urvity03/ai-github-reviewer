@@ -8,11 +8,19 @@ import time
 
 from google import genai
 from google.genai import types
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from ai_reviewer.config import AppConfig
-from ai_reviewer.models.review import ReviewContext, ReviewResult
+from ai_reviewer.models.review import DecisionEnum, ReviewContext, ReviewFinding, ReviewResult
 from ai_reviewer.providers.base import AIReviewer
+
+
+class AIReviewOutput(BaseModel):
+    """Clean structured schema strictly conforming to Gemini response_schema requirements."""
+
+    summary: str
+    decision: DecisionEnum
+    findings: list[ReviewFinding] = Field(default_factory=list)
 
 
 class GeminiReviewer(AIReviewer):
@@ -40,7 +48,7 @@ class GeminiReviewer(AIReviewer):
         gen_config = types.GenerateContentConfig(
             system_instruction=system_prompt,
             response_mime_type="application/json",
-            response_schema=ReviewResult,
+            response_schema=AIReviewOutput,
             temperature=self.config.review.temperature,
         )
 
@@ -68,10 +76,14 @@ class GeminiReviewer(AIReviewer):
                 parsed_json = json.loads(raw_text)
 
                 # Validate with Pydantic model
-                result = ReviewResult.model_validate(parsed_json)
-                result.token_usage = token_usage
-                result.raw_output = raw_text
-                return result
+                output = AIReviewOutput.model_validate(parsed_json)
+                return ReviewResult(
+                    summary=output.summary,
+                    decision=output.decision,
+                    findings=output.findings,
+                    token_usage=token_usage,
+                    raw_output=raw_text,
+                )
 
             except (json.JSONDecodeError, ValidationError) as validation_err:
                 last_error = validation_err
