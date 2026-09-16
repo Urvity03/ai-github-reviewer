@@ -175,7 +175,7 @@ def test_dispatcher_review_command_on_pr():
     mock_orchestrator.run_review.assert_called_once()
     mock_gh.create_issue_comment.assert_called_once()
     body = mock_gh.create_issue_comment.call_args[0][3]
-    assert "Review Triggered via Command!" in body
+    assert "Review Triggered via JIAN 鉴!" in body
     assert "abc12345" in body
 
 
@@ -214,7 +214,7 @@ def test_dispatcher_explain_reads_prior_summary_with_findings():
     # itself proves the live path wasn't taken; but also verify the reply is correct.
     mock_gh.create_issue_comment.assert_called_once()
     body = mock_gh.create_issue_comment.call_args[0][3]
-    assert "JIAN Explanation" in body
+    assert "JIAN 鉴 Explanation" in body
     assert prior_summary_body in body
     # Must NOT claim "no issues" when summary contains findings
     assert "no issues" not in body.lower() or "no issues" in prior_summary_body.lower()
@@ -319,7 +319,7 @@ def test_dispatcher_explain_falls_back_to_live_review_when_no_summary():
     mock_orchestrator.run_review.assert_called_once()
     mock_gh.create_issue_comment.assert_called_once()
     body = mock_gh.create_issue_comment.call_args[0][3]
-    assert "JIAN Explanation" in body
+    assert "JIAN 鉴 Explanation" in body
     assert "ZeroDivisionError risk" in body
     assert "blocking" in body.lower()
     assert "Why this matters" in body

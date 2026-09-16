@@ -27,7 +27,7 @@ class GitHubClient:
         self.session.headers.update(
             {
                 "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "AI-GitHub-Reviewer-Bot",
+                "User-Agent": "JIAN-AI-Reviewer-Bot",
             }
         )
         if self.token:
@@ -268,7 +268,7 @@ class GitHubClient:
         commit_sha: str,
         status: CheckStatusEnum,
         summary: str,
-        title: str = "AI Code Review",
+        title: str = "JIAN 鉴 — AI Code Review",
     ) -> bool:
         """
         Create a GitHub Check Run, or fall back to Commit Status if Check Runs are unauthorized.

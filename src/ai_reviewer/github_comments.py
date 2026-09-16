@@ -26,7 +26,7 @@ def format_inline_comment(finding: ReviewFinding) -> str:
     if finding.suggested_fix:
         body += f"**Suggested Fix:**\n```suggestion\n{finding.suggested_fix}\n```\n"
 
-    body += f"\n*Confidence: {int(finding.confidence * 100)}% | [Rule: {finding.category.value}]*"
+    body += f"\n*Reviewed by JIAN 鉴 • Confidence: {int(finding.confidence * 100)}% | [Rule: {finding.category.value}]*"
     return body
 
 
@@ -39,7 +39,7 @@ def format_summary_comment(
 ) -> str:
     """Format the full bot summary comment in GitHub Flavored Markdown."""
     lines: list[str] = [SUMMARY_MARKER]
-    lines.append("## 🤖 AI Code Review")
+    lines.append("## 🤖 JIAN 鉴 — AI Code Review")
     lines.append("")
 
     # 1. Overall Status
@@ -120,6 +120,6 @@ def format_summary_comment(
     # 6. Footer & Commit Info
     short_sha = commit_sha[:8] if len(commit_sha) >= 8 else commit_sha
     lines.append("---")
-    lines.append(f"Reviewed commit: `{short_sha}`  •  *AI-generated review — human validation is still recommended.*")
+    lines.append(f"Reviewed commit: `{short_sha}`  •  *JIAN 鉴 AI-generated review — human validation is still recommended.*")
 
     return "\n".join(lines)

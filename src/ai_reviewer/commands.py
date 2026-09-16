@@ -11,7 +11,16 @@ from ai_reviewer.github_client import GitHubClient
 from ai_reviewer.reviewer import ReviewOrchestrator
 
 COMMAND_REPLY_MARKER = "<!-- jian-command-reply -->"
-BOT_LOGINS = {"github-actions", "github-actions[bot]", "jian", "jian[bot]"}
+BOT_LOGINS = {
+    "github-actions",
+    "github-actions[bot]",
+    "jian",
+    "jian[bot]",
+    "jian-jian",
+    "jian-jian[bot]",
+    "jian-ai-reviewer",
+    "jian-ai-reviewer[bot]",
+}
 
 
 def parse_command(text: str) -> str | None:
@@ -30,28 +39,37 @@ def parse_command(text: str) -> str | None:
     if not cleaned:
         return None
 
-    pattern = r"^(?:@(?:jian|ai-reviewer|bot)\s+)?/?(ping|help|review|explain)(?:\s+.*)?$"
     first_line = cleaned.splitlines()[0].strip()
-    match = re.search(pattern, first_line, re.IGNORECASE)
-    if match:
-        return match.group(1).lower()
+    match = re.match(
+        r"^(?:@(?:jian|ai-reviewer|bot)\s+)?/?(ping|help|review|explain)(?:\s+.*)?$",
+        first_line,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
 
-    return None
+    return match.group(1).lower()
 
 
 def is_bot_comment(comment_data: dict[str, Any], sender_data: dict[str, Any] | None = None) -> bool:
-    """Check if comment was authored by a bot or automated workflow to prevent recursive loops."""
-    user = comment_data.get("user", {}) or {}
-    user_type = (user.get("type") or "").lower()
-    login = (user.get("login") or "").lower()
+    """Determine whether a comment was authored by a bot or by JIAN itself."""
+    user = comment_data.get("user") or {}
+    user_type = user.get("type", "").lower()
+    user_login = user.get("login", "").lower()
 
-    if user_type == "bot" or login.endswith("[bot]") or login in BOT_LOGINS:
+    if user_type == "bot":
+        return True
+
+    if user_login.endswith("[bot]"):
+        return True
+
+    if user_login in BOT_LOGINS:
         return True
 
     if sender_data:
-        s_type = (sender_data.get("type") or "").lower()
-        s_login = (sender_data.get("login") or "").lower()
-        if s_type == "bot" or s_login.endswith("[bot]") or s_login in BOT_LOGINS:
+        sender_type = sender_data.get("type", "").lower()
+        sender_login = sender_data.get("login", "").lower()
+        if sender_type == "bot" or sender_login.endswith("[bot]") or sender_login in BOT_LOGINS:
             return True
 
     # Check if comment already has our reply marker (prevent echoing)
@@ -63,7 +81,7 @@ def is_bot_comment(comment_data: dict[str, Any], sender_data: dict[str, Any] | N
 
 
 class CommandDispatcher:
-    """Dispatches interactive bot commands on GitHub issues and pull requests."""
+    """Dispatches @JIAN slash commands and posts responses to GitHub."""
 
     def __init__(
         self,
@@ -130,7 +148,7 @@ class CommandDispatcher:
         """Respond with online health confirmation."""
         reply = (
             f"{COMMAND_REPLY_MARKER}\n"
-            "🏓 **Pong!** JIAN AI Code Reviewer is online, healthy, and ready to assist.\n\n"
+            "🏓 **Pong!** JIAN 鉴 is online, healthy, and ready to assist.\n\n"
             f"*Provider:* `{self.config.review.provider}` ({self.config.review.model})  •  "
             "Type `@JIAN /help` to see available commands."
         )
@@ -141,7 +159,7 @@ class CommandDispatcher:
         """Respond with available command menu."""
         reply = (
             f"{COMMAND_REPLY_MARKER}\n"
-            "### 🤖 JIAN AI Reviewer — Interactive Commands\n\n"
+            "### 🤖 JIAN 鉴 — Interactive Commands\n\n"
             "Mention `@JIAN` with any of the following commands in an issue or pull request discussion:\n\n"
             "| Command | Scope | Description |\n"
             "| :--- | :--- | :--- |\n"
@@ -197,7 +215,7 @@ class CommandDispatcher:
 
         confirm_msg = (
             f"{COMMAND_REPLY_MARKER}\n"
-            f"🚀 **Review Triggered via Command!**\n\n"
+            f"🚀 **Review Triggered via JIAN 鉴!**\n\n"
             f"Successfully evaluated commit `{head_sha[:8]}`.\n"
             f"- **Decision**: `{review_result.decision.value.upper()}`\n"
             f"- **Status**: `{status.value}`\n"
@@ -315,26 +333,26 @@ class CommandDispatcher:
         intro: str
         if no_findings:
             intro = (
-                "✅ The latest JIAN review found **no issues** in this Pull Request. "
+                "✅ The latest JIAN 鉴 review found **no issues** in this Pull Request. "
                 "The changes adhere to clean code standards and pass all automated checks. 🎉"
             )
         elif has_blocking:
             intro = (
-                "🔴 The latest JIAN review found **blocking findings** that should be "
+                "🔴 The latest JIAN 鉴 review found **blocking findings** that should be "
                 "addressed before merging. See the detailed findings below."
             )
         else:
             intro = (
-                "🟡 The latest JIAN review found **non-blocking warnings** (no blocking "
+                "🟡 The latest JIAN 鉴 review found **non-blocking warnings** (no blocking "
                 "defects). These are worth addressing but will not block the merge."
             )
 
         return (
             f"{COMMAND_REPLY_MARKER}\n"
-            f"### 🎓 JIAN Explanation for PR #{issue_number}\n\n"
+            f"### 🎓 JIAN 鉴 Explanation for PR #{issue_number}\n\n"
             f"{intro}\n\n"
             "---\n"
-            "**Latest JIAN Review Summary:**\n\n"
+            "**Latest JIAN 鉴 Review Summary:**\n\n"
             f"{summary_body}\n\n"
             "---\n"
             "*To re-run the review after committing new changes, reply with `@JIAN /review`.*"
@@ -351,8 +369,8 @@ class CommandDispatcher:
         if not findings:
             return (
                 f"{COMMAND_REPLY_MARKER}\n"
-                "### 🎓 JIAN Explanation\n\n"
-                f"✅ No prior JIAN review exists, so I ran a live review of commit "
+                "### 🎓 JIAN 鉴 Explanation\n\n"
+                f"✅ No prior JIAN 鉴 review exists, so I ran a live review of commit "
                 f"`{head_sha[:8]}` and found **no issues**. "
                 "The changes look clean. 🎉"
             )
@@ -367,7 +385,7 @@ class CommandDispatcher:
 
         parts = [
             f"{COMMAND_REPLY_MARKER}\n",
-            f"### 🎓 JIAN Explanation for PR #{issue_number} (`{head_sha[:8]}`)\n\n",
+            f"### 🎓 JIAN 鉴 Explanation for PR #{issue_number} (`{head_sha[:8]}`)\n\n",
             f"> **Summary**: {summary}\n\n",
             f"{verdict}\n\n",
             "Here is an in-depth explanation of each finding:\n\n",
