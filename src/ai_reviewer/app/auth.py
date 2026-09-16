@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -28,8 +29,9 @@ class GitHubAppAuth:
             or os.getenv("GITHUB_APP_PRIVATE_KEY")
         )
         self._private_key_path = os.getenv("GITHUB_APP_PRIVATE_KEY_PATH")
-        # In-memory token cache: installation_id -> (token, expires_at_timestamp)
+        # Thread-safe in-memory token cache: installation_id -> (token, expires_at_timestamp)
         self._token_cache: dict[int, tuple[str, float]] = {}
+        self._lock = threading.Lock()
 
     def get_private_key(self) -> str:
         """Resolve private key from raw string, environment, or file path, normalizing format."""
@@ -92,10 +94,11 @@ class GitHubAppAuth:
         Uses in-memory cache to reuse valid tokens before expiration.
         """
         now = time.time()
-        cached = self._token_cache.get(installation_id)
-        # Reuse cached token if it has at least 5 minutes remaining
-        if cached and cached[1] > (now + 300):
-            return cached[0]
+        with self._lock:
+            cached = self._token_cache.get(installation_id)
+            # Reuse cached token if it has at least 5 minutes remaining
+            if cached and cached[1] > (now + 300):
+                return cached[0]
 
         jwt_token = self.create_jwt()
         url = f"{self.base_url}/app/installations/{installation_id}/access_tokens"
@@ -112,6 +115,7 @@ class GitHubAppAuth:
         token = data["token"]
         # Default expiration is 1 hour (3600 seconds)
         expires_at_timestamp = now + 3600
-        self._token_cache[installation_id] = (token, expires_at_timestamp)
+        with self._lock:
+            self._token_cache[installation_id] = (token, expires_at_timestamp)
 
         return token
