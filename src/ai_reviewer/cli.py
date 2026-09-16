@@ -141,9 +141,9 @@ def review(
         owner, repo_name = env_repo.split("/", 1)
 
     changed_files = []
-    head_sha = "HEAD"
-    base_branch = base or "main"
-    head_branch = "current"
+    head_sha = os.getenv("GITHUB_HEAD_SHA") or "HEAD"
+    base_branch = base or os.getenv("GITHUB_BASE_REF") or "main"
+    head_branch = os.getenv("GITHUB_HEAD_REF") or "current"
     pr_title = "Local Code Changes"
     pr_description = "Local developer review execution"
 
@@ -156,9 +156,9 @@ def review(
             pr_data = gh_client.get_pull_request(owner, repo_name, env_pr)
             pr_title = pr_data.get("title", "")
             pr_description = pr_data.get("body", "") or ""
-            base_branch = pr_data.get("base", {}).get("ref", "main")
-            head_branch = pr_data.get("head", {}).get("ref", "head")
-            head_sha = pr_data.get("head", {}).get("sha", "HEAD")
+            base_branch = base or os.getenv("GITHUB_BASE_REF") or pr_data.get("base", {}).get("ref", "main")
+            head_branch = os.getenv("GITHUB_HEAD_REF") or pr_data.get("head", {}).get("ref", "head")
+            head_sha = os.getenv("GITHUB_HEAD_SHA") or pr_data.get("head", {}).get("sha", "HEAD")
             changed_files = gh_client.get_pull_request_files(owner, repo_name, env_pr)
         except Exception as err:
             console.print(f"[bold red]Failed to fetch PR from GitHub API: {err}. Falling back to local git diff.[/bold red]")
@@ -188,7 +188,17 @@ def review(
             pr_title = f"Local File Review: {file}"
         else:
             # Run git diff against base branch or HEAD
-            git_diff_cmd = ["git", "diff", f"{base_branch}...HEAD"] if base else ["git", "diff", "HEAD"]
+            diff_ref = base_branch
+            if base or os.getenv("GITHUB_BASE_REF"):
+                check_local = subprocess.run(["git", "rev-parse", "--verify", diff_ref], capture_output=True, text=True, check=False)
+                if check_local.returncode != 0:
+                    check_remote = subprocess.run(["git", "rev-parse", "--verify", f"origin/{diff_ref}"], capture_output=True, text=True, check=False)
+                    if check_remote.returncode == 0:
+                        diff_ref = f"origin/{diff_ref}"
+                git_diff_cmd = ["git", "diff", f"{diff_ref}...HEAD"]
+            else:
+                git_diff_cmd = ["git", "diff", "HEAD"]
+
             try:
                 diff_res = subprocess.run(git_diff_cmd, capture_output=True, text=True, check=False)
                 raw_diff = diff_res.stdout
@@ -201,13 +211,14 @@ def review(
                 console.print(f"[bold red]Git command failed: {e}[/bold red]")
                 raise typer.Exit(code=1)
 
-            # Get current commit SHA
-            try:
-                sha_res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
-                if sha_res.returncode == 0:
-                    head_sha = sha_res.stdout.strip()
-            except Exception:
-                pass
+            # Get current commit SHA if not set
+            if head_sha == "HEAD":
+                try:
+                    sha_res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False)
+                    if sha_res.returncode == 0:
+                        head_sha = sha_res.stdout.strip()
+                except Exception:
+                    pass
 
     if not changed_files:
         console.print("[green]No changes detected to review.[/green]")

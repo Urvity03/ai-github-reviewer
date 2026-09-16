@@ -130,11 +130,14 @@ class ReviewOrchestrator:
 
         # Update review result summary if needed
         final_summary = ai_result.summary if ai_result else "Review completed."
-        final_decision = (
-            DecisionEnum.REQUEST_CHANGES
-            if check_status == CheckStatusEnum.FAIL
-            else (DecisionEnum.APPROVE if check_status == CheckStatusEnum.PASS and not valid_findings else DecisionEnum.COMMENT)
-        )
+        if context.truncated:
+            final_decision = DecisionEnum.COMMENT
+        else:
+            final_decision = (
+                DecisionEnum.REQUEST_CHANGES
+                if check_status == CheckStatusEnum.FAIL
+                else (DecisionEnum.APPROVE if check_status == CheckStatusEnum.PASS and not valid_findings else DecisionEnum.COMMENT)
+            )
 
         final_result = ReviewResult(
             summary=final_summary,
@@ -192,6 +195,7 @@ class ReviewOrchestrator:
                         {
                             "path": norm_file,
                             "line": finding.line,
+                            "side": "RIGHT",
                             "body": format_inline_comment(finding),
                         }
                     )
@@ -211,8 +215,8 @@ class ReviewOrchestrator:
                 )
             except Exception as err:
                 console.print(f"[bold red]Failed to post inline comments:[/bold red] {err}")
-                # Fallback: add inline findings to unattached so they appear in summary
-                unattached_findings.extend(result.findings)
+                # Fallback: present all findings in summary if inline posting failed
+                unattached_findings = list(result.findings)
 
         # 2. Post or update the summary comment
         summary_markdown = format_summary_comment(

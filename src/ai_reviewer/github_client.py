@@ -100,9 +100,14 @@ class GitHubClient:
         inline_comments: list[dict[str, Any]],
         body: str | None = None,
     ) -> dict[str, Any]:
-        """Create a PR review with multiple inline comments in a single batch."""
+        """Create PR review comments, falling back to individual line comments on batch failure."""
         if not inline_comments and not body:
             return {}
+
+        # Ensure side is specified for each comment
+        for c in inline_comments:
+            if "side" not in c:
+                c["side"] = "RIGHT"
 
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
         payload: dict[str, Any] = {
@@ -114,24 +119,57 @@ class GitHubClient:
         if inline_comments:
             payload["comments"] = inline_comments
 
-        res = self.session.post(url, json=payload, timeout=30)
-        res.raise_for_status()
-        return res.json()
+        try:
+            res = self.session.post(url, json=payload, timeout=30)
+            if res.status_code in (200, 201):
+                return res.json()
+            # If batch fails (e.g. 422), attempt individual comment fallback below
+        except Exception:
+            pass
+
+        # Fallback: post comments individually so one bad line doesn't block the rest
+        posted_comments = []
+        indiv_url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/comments"
+        for c in inline_comments:
+            indiv_payload = {
+                "body": c["body"],
+                "commit_id": commit_sha,
+                "path": c["path"],
+                "line": c["line"],
+                "side": c.get("side", "RIGHT"),
+            }
+            try:
+                indiv_res = self.session.post(indiv_url, json=indiv_payload, timeout=30)
+                if indiv_res.status_code in (200, 201):
+                    posted_comments.append(indiv_res.json())
+            except Exception:
+                pass
+
+        return {"comments": posted_comments}
 
     def post_or_update_summary_comment(
         self, owner: str, repo: str, pull_number: int, summary_body: str
     ) -> dict[str, Any]:
         """Create or update existing bot summary comment on the PR discussion."""
         comments_url = f"{self.base_url}/repos/{owner}/{repo}/issues/{pull_number}/comments"
-        res = self.session.get(comments_url, params={"per_page": 100}, timeout=30)
-        res.raise_for_status()
-        comments = res.json()
-
         existing_comment_id = None
-        for comment in comments:
-            if SUMMARY_MARKER in comment.get("body", ""):
-                existing_comment_id = comment["id"]
+        page = 1
+
+        while True:
+            res = self.session.get(comments_url, params={"page": page, "per_page": 100}, timeout=30)
+            res.raise_for_status()
+            comments = res.json()
+            if not comments:
                 break
+
+            for comment in comments:
+                if SUMMARY_MARKER in comment.get("body", ""):
+                    existing_comment_id = comment["id"]
+                    break
+
+            if existing_comment_id:
+                break
+            page += 1
 
         if existing_comment_id:
             # Update existing comment
