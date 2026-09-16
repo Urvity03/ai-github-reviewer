@@ -30,6 +30,9 @@ RUN pip install --no-cache-dir -e .
 # Switch to non-root user
 USER reviewer
 
-# Default CLI entrypoint
+# Expose default webhook server port
+EXPOSE 8000
+
+# Default entrypoint to start webhook server
 ENTRYPOINT ["ai-reviewer"]
-CMD ["doctor"]
+CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]

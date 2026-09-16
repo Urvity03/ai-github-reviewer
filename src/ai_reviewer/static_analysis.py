@@ -33,12 +33,19 @@ def run_python_syntax_check(changed_files: list[ChangedFile], repo_root: Path) -
         )
 
     for f in py_files:
-        file_path = repo_root / f.filename
-        if not file_path.is_file():
+        code = f.content_after
+        if code is None:
+            file_path = repo_root / f.filename
+            if file_path.is_file():
+                try:
+                    code = file_path.read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    code = None
+        if code is None:
             continue
+
         try:
-            code = file_path.read_text(encoding="utf-8", errors="replace")
-            compile(code, str(file_path), "exec")
+            compile(code, f.filename, "exec")
         except SyntaxError as err:
             findings.append(
                 ReviewFinding(
@@ -71,12 +78,20 @@ def run_secret_scanner(changed_files: list[ChangedFile], repo_root: Path) -> Det
     for f in changed_files:
         if f.is_binary or f.is_ignored or f.status == "deleted":
             continue
-        file_path = repo_root / f.filename
-        if not file_path.is_file():
+
+        content = f.content_after
+        if content is None:
+            file_path = repo_root / f.filename
+            if file_path.is_file():
+                try:
+                    content = file_path.read_text(encoding="utf-8", errors="replace")
+                except Exception:
+                    content = None
+
+        if content is None:
             continue
 
         try:
-            content = file_path.read_text(encoding="utf-8", errors="replace")
             scanned_count += 1
             file_findings = scan_file_content_for_secrets(f.filename, content)
             findings.extend(file_findings)

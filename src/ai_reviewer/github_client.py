@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import os
 from typing import Any
 
@@ -32,6 +33,25 @@ class GitHubClient:
         if self.token:
             self.session.headers["Authorization"] = f"Bearer {self.token}"
 
+    def get_file_content(
+        self, owner: str, repo: str, path: str, ref: str | None = None
+    ) -> str | None:
+        """Fetch raw text content of a file from repository via GitHub API."""
+        url = f"{self.base_url}/repos/{owner}/{repo}/contents/{path.lstrip('/')}"
+        params = {"ref": ref} if ref else {}
+        try:
+            res = self.session.get(url, params=params, timeout=30)
+            if res.status_code == 404:
+                return None
+            res.raise_for_status()
+            data = res.json()
+            if isinstance(data, dict) and "content" in data:
+                raw_b64 = data["content"]
+                return base64.b64decode(raw_b64).decode("utf-8", errors="replace")
+            return None
+        except Exception:
+            return None
+
     def get_pull_request(self, owner: str, repo: str, pull_number: int) -> dict[str, Any]:
         """Fetch pull request metadata."""
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
@@ -39,8 +59,15 @@ class GitHubClient:
         res.raise_for_status()
         return res.json()
 
-    def get_pull_request_files(self, owner: str, repo: str, pull_number: int) -> list[ChangedFile]:
-        """Fetch list of changed files with diff patches."""
+    def get_pull_request_files(
+        self,
+        owner: str,
+        repo: str,
+        pull_number: int,
+        head_sha: str | None = None,
+        fetch_content: bool = False,
+    ) -> list[ChangedFile]:
+        """Fetch list of changed files with diff patches and optional file contents."""
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}/files"
         files: list[ChangedFile] = []
         page = 1
@@ -57,6 +84,10 @@ class GitHubClient:
                 hunks = parse_patch_to_hunks(patch_str) if patch_str else []
                 is_binary = item.get("status") == "modified" and not patch_str and item.get("additions", 0) == 0
 
+                content_after = None
+                if fetch_content and head_sha and not is_binary and item.get("status") != "deleted":
+                    content_after = self.get_file_content(owner, repo, item["filename"], ref=head_sha)
+
                 cf = ChangedFile(
                     filename=item["filename"],
                     status=item.get("status", "modified"),
@@ -66,6 +97,7 @@ class GitHubClient:
                     patch=patch_str,
                     hunks=hunks,
                     is_binary=is_binary,
+                    content_after=content_after,
                 )
                 files.append(cf)
 

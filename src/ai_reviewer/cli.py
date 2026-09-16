@@ -275,6 +275,19 @@ def review(
         raise typer.Exit(code=1)
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="Host to bind server to"),
+    port: int = typer.Option(8000, "--port", "-p", help="Port to listen on"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for local development"),
+) -> None:
+    """Start the GitHub App webhook receiver server."""
+    import uvicorn
+
+    console.print(Panel.fit(f"[bold blue]Starting GitHub App Webhook Server on {host}:{port}[/bold blue]"))
+    uvicorn.run("ai_reviewer.app.server:create_app", host=host, port=port, factory=True, reload=reload)
+
+
 def main() -> None:
     app()
 

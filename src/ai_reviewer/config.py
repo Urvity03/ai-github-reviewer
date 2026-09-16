@@ -151,3 +151,14 @@ def load_config(config_path: str | None = None) -> AppConfig:
                 print(f"[WARN] Error reading config file {candidate}: {err}. Using defaults.")
 
     return AppConfig()
+
+
+def load_config_from_yaml(yaml_str: str) -> AppConfig:
+    """Parse configuration directly from a YAML string."""
+    try:
+        data = yaml.safe_load(yaml_str) or {}
+        return AppConfig.model_validate(data)
+    except Exception as err:
+        print(f"[WARN] Error reading YAML config: {err}. Using defaults.")
+        return AppConfig()
+
