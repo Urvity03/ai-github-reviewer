@@ -5,7 +5,7 @@ review:
   enabled: true
   language: auto  # auto, python, typescript, javascript, generic
   provider: gemini  # gemini (default zero-cost free tier), openai
-  model: gemini-2.0-flash
+  model: gemini-3.6-flash
   temperature: 0.1
   confidence_threshold: 0.7  # Filter out speculative findings below 0.7 confidence
 

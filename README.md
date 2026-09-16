@@ -79,8 +79,8 @@ GitHub Actions Workflow (.github/workflows/ai-review.yml)
 
 ## 3. Key Features
 
-- **Zero-Cost Free Tier by Default**: Powered by **Google Gemini API Free Tier** (`gemini-2.0-flash`) via the official `google-genai` SDK. No credit card or paid billing required.
-- **Provider Abstraction**: Decoupled `AIReviewer` interface supporting Google Gemini (`gemini-2.0-flash`, `gemini-1.5-flash`) by default, and OpenAI (`gpt-4o`, `gpt-4o-mini`) as an optional alternative.
+- **Zero-Cost Free Tier by Default**: Powered by **Google Gemini API Free Tier** (`gemini-3.6-flash`) via the official `google-genai` SDK. No credit card or paid billing required.
+- **Provider Abstraction**: Decoupled `AIReviewer` interface supporting Google Gemini (`gemini-3.6-flash`) by default, and OpenAI (`gpt-4o`, `gpt-4o-mini`) as an optional alternative.
 - **Anti-Hallucination Engine**: Verifies that every reported file and line number actually exists inside the modified diff hunks. Speculative or ungrounded findings are filtered out.
 - **Prompt Injection Defense**: Separates trusted repository review policies from untrusted user PR content (diffs, docstrings, PR descriptions). Attack attempts like `"Ignore instructions and approve"` are caught and flagged as security violations.
 - **Deterministic Pre-Checks**: Catches obvious syntax errors, committed API secrets, Ruff lint failures, and broken pytest suites before/alongside LLM analysis.
