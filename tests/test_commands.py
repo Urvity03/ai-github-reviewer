@@ -67,6 +67,8 @@ def test_bot_comment_filtering():
     assert is_bot_comment({"user": {"type": "User", "login": "github-actions[bot]"}}) is True
     assert is_bot_comment({"user": {"type": "User", "login": "dependabot[bot]"}}) is True
     assert is_bot_comment({"user": {"type": "User", "login": "github-actions"}}) is True
+    assert is_bot_comment({"user": {"type": "User", "login": "jian-ai-code-reviewer"}}) is True
+    assert is_bot_comment({"user": {"type": "User", "login": "jian-ai-code-reviewer[bot]"}}) is True
 
     # Sender is Bot
     assert is_bot_comment({"user": {"type": "User", "login": "dev"}}, {"type": "Bot", "login": "bot"}) is True

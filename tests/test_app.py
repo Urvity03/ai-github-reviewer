@@ -135,6 +135,50 @@ def test_github_app_jwt_generation(rsa_test_key_pem):
     assert decoded["exp"] > decoded["iat"]
 
 
+def test_github_app_key_loading_from_file_path(tmp_path, rsa_test_key_pem):
+    """Verify loading private key from a .pem file on disk via path."""
+    pem_file = tmp_path / "test-key.pem"
+    pem_file.write_text(rsa_test_key_pem, encoding="utf-8")
+
+    # 1. Passed as private_key parameter directly with file path
+    auth_direct_path = GitHubAppAuth(app_id="123456", private_key=str(pem_file))
+    assert auth_direct_path.get_private_key() == rsa_test_key_pem.strip()
+
+    # 2. Passed via GITHUB_PRIVATE_KEY_PATH environment variable
+    with patch.dict("os.environ", {"GITHUB_PRIVATE_KEY_PATH": str(pem_file)}, clear=True):
+        auth_env_path = GitHubAppAuth(app_id="123456")
+        assert auth_env_path.get_private_key() == rsa_test_key_pem.strip()
+
+    # 3. Passed via GITHUB_PRIVATE_KEY pointing to file path
+    with patch.dict("os.environ", {"GITHUB_PRIVATE_KEY": str(pem_file)}, clear=True):
+        auth_env_file = GitHubAppAuth(app_id="123456")
+        assert auth_env_file.get_private_key() == rsa_test_key_pem.strip()
+
+
+def test_github_app_key_parsing_formats(rsa_test_key_pem):
+    """Verify handling of CRLF, escaped \\n, surrounding quotes, and base64."""
+    # Windows CRLF
+    crlf_key = rsa_test_key_pem.replace("\n", "\r\n")
+    auth_crlf = GitHubAppAuth(app_id="123456", private_key=crlf_key)
+    assert "\r\n" not in auth_crlf.get_private_key()
+    assert auth_crlf.get_private_key() == rsa_test_key_pem.strip()
+
+    # Single-line escaped \\n
+    escaped_key = rsa_test_key_pem.strip().replace("\n", "\\n")
+    auth_escaped = GitHubAppAuth(app_id="123456", private_key=escaped_key)
+    assert auth_escaped.get_private_key() == rsa_test_key_pem.strip()
+
+    # Quoted string
+    quoted_key = f'"{rsa_test_key_pem.strip()}"'
+    auth_quoted = GitHubAppAuth(app_id="123456", private_key=quoted_key)
+    assert auth_quoted.get_private_key() == rsa_test_key_pem.strip()
+
+    # Missing key error
+    with pytest.raises(ValueError, match="GitHub App private key is not configured"):
+        empty_auth = GitHubAppAuth(app_id="123456", private_key="")
+        empty_auth.get_private_key()
+
+
 @patch("requests.post")
 def test_github_app_token_exchange_and_caching(mock_post, rsa_test_key_pem):
     """Verify installation token exchange and in-memory caching."""

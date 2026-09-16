@@ -28,7 +28,10 @@ class GitHubAppAuth:
             or os.getenv("GITHUB_PRIVATE_KEY")
             or os.getenv("GITHUB_APP_PRIVATE_KEY")
         )
-        self._private_key_path = os.getenv("GITHUB_APP_PRIVATE_KEY_PATH")
+        self._private_key_path = (
+            os.getenv("GITHUB_PRIVATE_KEY_PATH")
+            or os.getenv("GITHUB_APP_PRIVATE_KEY_PATH")
+        )
         # Thread-safe in-memory token cache: installation_id -> (token, expires_at_timestamp)
         self._token_cache: dict[int, tuple[str, float]] = {}
         self._lock = threading.Lock()
@@ -38,7 +41,17 @@ class GitHubAppAuth:
         raw_key: str | None = None
         if self._raw_private_key:
             raw_key = self._raw_private_key.strip()
-        elif self._private_key_path:
+            # Strip surrounding quotes if present (e.g. from environment file export)
+            if (raw_key.startswith('"') and raw_key.endswith('"')) or (raw_key.startswith("'") and raw_key.endswith("'")):
+                raw_key = raw_key[1:-1].strip()
+
+            # If the raw string is a path to an existing .pem file on disk, read it
+            if not raw_key.startswith("-----BEGIN"):
+                candidate_path = Path(raw_key)
+                if candidate_path.is_file():
+                    raw_key = candidate_path.read_text(encoding="utf-8").strip()
+
+        if not raw_key and self._private_key_path:
             p = Path(self._private_key_path)
             if p.is_file():
                 raw_key = p.read_text(encoding="utf-8").strip()
@@ -48,10 +61,13 @@ class GitHubAppAuth:
         if not raw_key:
             raise ValueError(
                 "GitHub App private key is not configured. "
-                "Set GITHUB_PRIVATE_KEY, GITHUB_APP_PRIVATE_KEY, or GITHUB_APP_PRIVATE_KEY_PATH."
+                "Set GITHUB_PRIVATE_KEY, GITHUB_PRIVATE_KEY_PATH, or GITHUB_APP_PRIVATE_KEY_PATH."
             )
 
-        # Handle escaped newlines (e.g. \\n from environment variables)
+        # Normalize Windows CRLF line endings
+        raw_key = raw_key.replace("\r\n", "\n")
+
+        # Handle escaped newlines (e.g. \\n from single-line environment variable strings)
         if "\\n" in raw_key:
             raw_key = raw_key.replace("\\n", "\n")
 
@@ -61,7 +77,7 @@ class GitHubAppAuth:
             try:
                 decoded = base64.b64decode(raw_key).decode("utf-8")
                 if "-----BEGIN" in decoded:
-                    raw_key = decoded.strip()
+                    raw_key = decoded.strip().replace("\r\n", "\n")
             except Exception:
                 pass
 

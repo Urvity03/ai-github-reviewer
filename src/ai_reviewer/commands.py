@@ -20,6 +20,8 @@ BOT_LOGINS = {
     "jian-jian[bot]",
     "jian-ai-reviewer",
     "jian-ai-reviewer[bot]",
+    "jian-ai-code-reviewer",
+    "jian-ai-code-reviewer[bot]",
 }
 
 
