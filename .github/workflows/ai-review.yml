@@ -1,0 +1,62 @@
+name: AI Pull Request Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+# Prevent duplicate / concurrent runs on the same PR when fast pushes happen
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Minimum required permissions for GITHUB_TOKEN
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  statuses: write
+  issues: write
+
+jobs:
+  ai-review:
+    name: AI PR Code Review
+    # Don't run on draft PRs unless marked ready_for_review
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # Full history for proper base/head diff calculation
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Review Bot & Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install ruff pytest
+
+      - name: Run Review Diagnostics
+        run: |
+          ai-reviewer doctor
+
+      - name: Execute AI Code Review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          ai-reviewer review

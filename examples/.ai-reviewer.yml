@@ -1,0 +1,75 @@
+# AI Reviewer Configuration (.ai-reviewer.yml)
+# Place this file in the root of your repository to customize review behavior.
+
+review:
+  enabled: true
+  language: auto  # auto, python, typescript, javascript, generic
+  provider: openai
+  model: gpt-4o
+  temperature: 0.1
+  confidence_threshold: 0.7  # Filter out speculative findings below 0.7 confidence
+
+severity:
+  # Severities that trigger a check failure (FAIL status / PR block)
+  fail_on:
+    - critical
+    - high
+  # Severities that post inline comments
+  inline_comment_severities:
+    - critical
+    - high
+    - medium
+
+paths:
+  # Glob patterns to ignore during review
+  ignore:
+    - "*.lock"
+    - "package-lock.json"
+    - "poetry.lock"
+    - "uv.lock"
+    - "dist/**"
+    - "build/**"
+    - "*.min.js"
+    - "*.min.css"
+    - "vendor/**"
+    - "third_party/**"
+    - ".git/**"
+    - "*.svg"
+    - "*.png"
+    - "*.jpg"
+    - "*.jpeg"
+    - "*.pdf"
+    - "*.ipynb"
+
+limits:
+  max_changed_files: 100
+  max_diff_lines: 10000
+  max_context_tokens: 32000
+
+rules:
+  correctness: true
+  security: true
+  reliability: true
+  tests: true
+  performance: true
+  architecture: true
+  maintainability: true
+  documentation: true
+  ml: true
+
+deterministic_checks:
+  run_ruff: true
+  run_pytest: true
+  run_compile_check: true
+  run_secret_scan: true
+
+# Safety-critical and domain-specific rules (Always treated as high-priority review directives)
+custom_rules:
+  - "Never expose precise user location or GPS coordinates in logs or error traces."
+  - "Validate GPS telemetry for physical consistency before route analysis."
+  - "Reject physically impossible speed or acceleration values."
+  - "Handle missing GPS quality/fix indicators gracefully with fallbacks."
+  - "Do not silently swallow or discard telemetry errors."
+  - "Every safety-critical algorithm change requires dedicated unit and regression tests."
+  - "Avoid making a safety decision from one single noisy sensor signal without confirmation."
+  - "Document all algorithmic changes affecting risk estimation or hazard classification."
