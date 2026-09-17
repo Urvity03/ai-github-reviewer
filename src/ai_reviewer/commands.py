@@ -217,9 +217,12 @@ class CommandDispatcher:
 
         verdict = (
             "🟢 **SAFE TO MERGE**"
-            if review_result.decision.value.lower() == "approve"
-            and status.value.lower() == "passed"
-            and not review_result.findings
+            if (
+                not review_result.is_error
+                and review_result.decision.value.lower() == "approve"
+                and status.value.lower() == "passed"
+                and not review_result.findings
+            )
             else "🟡 **REVIEW FINDINGS BEFORE MERGING**"
         )
 
