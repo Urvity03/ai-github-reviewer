@@ -105,10 +105,22 @@ class ReviewOrchestrator:
                 all_findings.extend(ai_result.findings)
             except Exception as err:
                 console.print(f"[bold red]AI Reviewer Provider Error:[/bold red] {err}")
+                err_msg = str(err).strip()
+                import re
+                err_msg = re.sub(r"(key|token|auth)=([A-Za-z0-9_\-]+)", r"\1=[REDACTED]", err_msg, flags=re.IGNORECASE)
+                err_summary = err_msg.splitlines()[0] if err_msg else "Unknown provider error"
+                if len(err_summary) > 200:
+                    err_summary = err_summary[:197] + "..."
                 ai_result = ReviewResult(
-                    summary=f"AI Reviewer encountered an error during analysis: {err}",
+                    summary=(
+                        f"JIAN 鉴 could not complete the AI analysis because the configured AI provider was temporarily unavailable. "
+                        f"Deterministic checks that completed are reported below. This result should not be interpreted as an all-clear AI review. "
+                        f"Error: {err_summary}"
+                    ),
                     decision=DecisionEnum.COMMENT,
                     findings=[],
+                    is_error=True,
+                    error_message=err_summary,
                 )
         else:
             ai_result = ReviewResult(
@@ -125,7 +137,8 @@ class ReviewOrchestrator:
             console.print(f"[dim yellow]Validation Filter: {reason}[/dim yellow]")
 
         # 5. Determine overall check status
-        check_status = CheckStatusEnum.PASS
+        ai_failed = bool(ai_result and ai_result.is_error)
+        check_status = CheckStatusEnum.WARN if ai_failed else CheckStatusEnum.PASS
         if any(self.config.should_fail_on(f.severity) for f in valid_findings):
             check_status = CheckStatusEnum.FAIL
         elif any(f.severity == SeverityEnum.MEDIUM for f in valid_findings):
@@ -133,8 +146,12 @@ class ReviewOrchestrator:
 
         # Update review result summary if needed
         final_summary = ai_result.summary if ai_result else "Review completed."
-        if context.truncated:
-            final_decision = DecisionEnum.COMMENT
+        if context.truncated or ai_failed:
+            final_decision = (
+                DecisionEnum.REQUEST_CHANGES
+                if check_status == CheckStatusEnum.FAIL
+                else DecisionEnum.COMMENT
+            )
         else:
             final_decision = (
                 DecisionEnum.REQUEST_CHANGES
@@ -147,6 +164,8 @@ class ReviewOrchestrator:
             decision=final_decision,
             findings=valid_findings,
             token_usage=ai_result.token_usage if ai_result else None,
+            is_error=ai_failed,
+            error_message=ai_result.error_message if ai_result else None,
         )
 
         # 6. Report to GitHub (if not dry-run and GitHub token provided)

@@ -50,7 +50,16 @@ def format_summary_comment(
         CheckStatusEnum.ERROR: "🚨 **Review Execution Error**",
     }
     lines.append("### Overall")
-    lines.append(status_icons.get(check_status, "💬 **Review Completed**"))
+    if result.is_error:
+        if check_status == CheckStatusEnum.FAIL:
+            overall_status = "❌ **Changes Requested / Check Failed (AI Analysis Incomplete)**"
+        elif check_status == CheckStatusEnum.ERROR:
+            overall_status = "🚨 **Review Execution Error**"
+        else:
+            overall_status = "⚠️ **AI Analysis Incomplete**"
+    else:
+        overall_status = status_icons.get(check_status, "💬 **Review Completed**")
+    lines.append(overall_status)
     lines.append("")
     lines.append(f"> {result.summary.strip()}")
     lines.append("")
@@ -69,7 +78,10 @@ def format_summary_comment(
     total_findings = sum(counts.values())
     lines.append("### Findings")
     if total_findings == 0:
-        lines.append("🎉 No issues identified! Code is clean.")
+        if result.is_error:
+            lines.append("⚠️ AI analysis could not be completed. No deterministic issues identified.")
+        else:
+            lines.append("🎉 No issues identified! Code is clean.")
     else:
         lines.append(
             f"{SeverityEnum.CRITICAL.emoji} {counts[SeverityEnum.CRITICAL]} Critical &nbsp;&nbsp;|&nbsp;&nbsp; "

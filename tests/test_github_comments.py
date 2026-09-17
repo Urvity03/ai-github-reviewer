@@ -79,3 +79,57 @@ def test_format_summary_comment():
     assert "Private Key in Repository" in summary_text
     assert "Secret Scanner" in summary_text
     assert "Reviewed commit: `abcdef12`" in summary_text
+
+
+def test_format_summary_comment_on_ai_failure():
+    result = ReviewResult(
+        summary="JIAN 鉴 could not complete the AI analysis because the configured AI provider was temporarily unavailable. Deterministic checks that completed are reported below. This result should not be interpreted as an all-clear AI review. Error: 503 UNAVAILABLE",
+        decision=DecisionEnum.COMMENT,
+        findings=[],
+        is_error=True,
+        error_message="503 UNAVAILABLE",
+    )
+    det_checks = [
+        DeterministicCheckResult(name="Python Syntax Check", status="passed", details="Valid", findings=[]),
+    ]
+
+    summary_text = format_summary_comment(
+        result=result,
+        deterministic_results=det_checks,
+        commit_sha="abcdef123456789",
+        unattached_findings=[],
+        check_status=CheckStatusEnum.WARN,
+    )
+
+    # Must display incomplete warning
+    assert "⚠️ **AI Analysis Incomplete**" in summary_text
+    # Must NOT emit all-clear or clean code celebrations
+    assert "✅ **All Checks Passed**" not in summary_text
+    assert "🎉 No issues identified! Code is clean." not in summary_text
+    # Must inform that deterministic checks completed and no deterministic issues were found
+    assert "⚠️ AI analysis could not be completed. No deterministic issues identified." in summary_text
+    assert "Python Syntax Check" in summary_text
+    assert "✅ Passed" in summary_text
+
+
+def test_format_summary_comment_clean_review():
+    result = ReviewResult(
+        summary="All code looks good!",
+        decision=DecisionEnum.APPROVE,
+        findings=[],
+        is_error=False,
+    )
+    det_checks = [
+        DeterministicCheckResult(name="Python Syntax Check", status="passed", details="Valid", findings=[]),
+    ]
+
+    summary_text = format_summary_comment(
+        result=result,
+        deterministic_results=det_checks,
+        commit_sha="abcdef123456789",
+        unattached_findings=[],
+        check_status=CheckStatusEnum.PASS,
+    )
+
+    assert "✅ **All Checks Passed**" in summary_text
+    assert "🎉 No issues identified! Code is clean." in summary_text

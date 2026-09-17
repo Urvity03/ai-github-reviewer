@@ -111,6 +111,8 @@ class ReviewResult(BaseModel):
     findings: list[ReviewFinding] = Field(default_factory=list)
     token_usage: dict[str, int] | None = None
     raw_output: str | None = None
+    is_error: bool = False
+    error_message: str | None = None
 
 
 class DiffHunk(BaseModel):

@@ -82,3 +82,34 @@ def test_orchestrator_fails_on_critical_finding():
     assert status == CheckStatusEnum.FAIL
     assert result.decision == DecisionEnum.REQUEST_CHANGES
     assert len(result.findings) == 1
+
+
+class FailingAIProvider(AIReviewer):
+    def review(self, context, system_prompt, user_prompt):
+        raise RuntimeError("503 UNAVAILABLE: This model is currently experiencing high demand.")
+
+
+def test_orchestrator_ai_provider_failure_returns_warn_and_comment():
+    cfg = AppConfig()
+    provider = FailingAIProvider(cfg)
+    orchestrator = ReviewOrchestrator(config=cfg, provider=provider)
+
+    hunk = DiffHunk(
+        old_start=1, old_lines=5, new_start=1, new_lines=6, header="",
+        lines=["@@ -1,5 +1,6 @@"], added_new_lines={6}, valid_new_lines={1, 2, 3, 4, 5, 6}
+    )
+    cf = ChangedFile(filename="src/app.py", additions=1, deletions=0, hunks=[hunk])
+    ctx = ReviewContext(
+        repo_owner="test", repo_name="repo", pr_number=3, pr_title="Test PR",
+        pr_description="", base_branch="main", head_branch="feat", commit_sha="789",
+        changed_files=[cf]
+    )
+
+    result, status = orchestrator.run_review(ctx, dry_run=True)
+    # AI failure must never result in PASS or APPROVE
+    assert status == CheckStatusEnum.WARN
+    assert result.decision == DecisionEnum.COMMENT
+    assert result.is_error is True
+    assert "could not complete the AI analysis" in result.summary
+    assert "503 UNAVAILABLE" in result.summary
+    assert len(result.findings) == 0
