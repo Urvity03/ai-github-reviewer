@@ -112,7 +112,8 @@ def test_openai_provider_retry_on_malformed_json(mock_openai_cls):
     assert mock_client.chat.completions.create.call_count == 2
 
 
-def test_gemini_provider_missing_api_key():
+def test_gemini_provider_missing_api_key(monkeypatch):
+    monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     cfg = AppConfig()
     with pytest.raises(ValueError, match="GEMINI_API_KEY environment variable is not set"):
         from ai_reviewer.providers.gemini import GeminiReviewer
@@ -216,3 +217,5 @@ def test_gemini_provider_retry_on_malformed_json(mock_genai_client_cls):
     assert result.decision == DecisionEnum.APPROVE
     assert len(result.findings) == 0
     assert mock_client.models.generate_content.call_count == 2
+
+
