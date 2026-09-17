@@ -1,4 +1,4 @@
-﻿# Terms of Service for JIAN 鉴
+# Terms of Service for JIAN 鉴
 
 **Effective Date:** September 17, 2026  
 **Last Updated:** September 17, 2026  
@@ -16,6 +16,8 @@ By installing the **JIAN 鉴** GitHub App on your GitHub account or repository, 
 ## 2. Description of Service
 
 JIAN 鉴 is an automated software tool that analyzes code changes in GitHub Pull Requests using static analysis and generative AI models (Google Gemini). It publishes advisory feedback, code quality suggestions, inline comments, and check runs.
+
+To provide these reviews, repository content (including git diffs, changed file snippets, and PR descriptions) is transmitted over TLS to third-party infrastructure (Render hosting and Google Gemini API).
 
 ---
 
@@ -44,7 +46,7 @@ When using JIAN 鉴, you agree that you will not:
 ## 5. Modifications and Service Availability
 
 - We reserve the right to modify, suspend, or discontinue JIAN 鉴 at any time without prior notice.
-- While we strive for 99.9% uptime on our production infrastructure, we do not guarantee uninterrupted or error-free operation.
+- JIAN 鉴 is provided on a best-effort basis without uptime guarantees or Service Level Agreements (SLAs). The public demonstration instance is hosted on Render's free tier, which may spin down during periods of inactivity and incur cold start latency, temporary unavailability, or rate limits.
 
 ---
 

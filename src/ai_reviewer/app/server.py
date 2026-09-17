@@ -52,7 +52,7 @@ def create_app(
         """Return Privacy Policy overview and document link."""
         return {
             "app": "JIAN 鉴",
-            "policy": "Zero permanent storage. Diffs and code changes are processed ephemerally in memory.",
+            "policy": "Ephemeral in-memory processing. JIAN does not persist repository code. Transmitted to Google Gemini API per applicable data-use terms.",
             "document_url": "https://github.com/Urvity03/ai-github-reviewer/blob/master/docs/PRIVACY.md",
         }
 
@@ -61,7 +61,7 @@ def create_app(
         """Return Terms of Service overview and document link."""
         return {
             "app": "JIAN 鉴",
-            "terms": "AI reviews are advisory only. Developers remain solely responsible for code merged.",
+            "terms": "AI reviews are advisory only without uptime guarantees. Developers remain solely responsible for code merged.",
             "document_url": "https://github.com/Urvity03/ai-github-reviewer/blob/master/docs/TERMS.md",
         }
 
