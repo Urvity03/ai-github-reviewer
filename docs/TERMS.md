@@ -46,7 +46,7 @@ When using JIAN 鉴, you agree that you will not:
 ## 5. Modifications and Service Availability
 
 - We reserve the right to modify, suspend, or discontinue JIAN 鉴 at any time without prior notice.
-- JIAN 鉴 is provided on a best-effort basis without uptime guarantees or Service Level Agreements (SLAs). The public demonstration instance is hosted on Render's free tier, which may spin down during periods of inactivity and incur cold start latency, temporary unavailability, or rate limits.
+- JIAN 鉴 is provided on a best-effort basis without uptime guarantees or Service Level Agreements (SLAs). The public demonstration backend is hosted on Render's Free tier, which spins down after 15 minutes of inactivity. The first request following an idle period may experience approximately one minute of cold-start latency, temporary unavailability, or rate limits.
 
 ---
 

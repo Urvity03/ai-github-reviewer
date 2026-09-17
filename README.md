@@ -158,7 +158,8 @@ ignore_paths:
 
 ## ⚠️ Limitations
 
-- **Render Free Tier Spin-Down & Cold Starts**: The public demonstration backend is hosted on Render's Free tier, which spins down after 15 minutes of inactivity. The first webhook or request following an idle period may take 30–50 seconds to complete cold boot.
+- **Render Free Tier Spin-Down & Cold Starts**: The public demonstration backend is hosted on Render's Free tier, which spins down after 15 minutes of inactivity. The first request following an idle period may experience approximately one minute of cold-start latency.
+- **Gemini API Usage Quotas**: Gemini API usage limits vary by model and usage tier. The public demonstration deployment currently uses the Gemini API Free Tier. For higher-volume usage, migrate the deployment to a paid Gemini API usage tier and monitor the model/project-specific quotas in Google AI Studio.
 - **Large PR Truncation**: PRs modifying more than 100 files or 2,000 diff lines are truncated to protect model context windows and execution deadlines. Deterministic checks continue to run on modified files.
 - **Draft PRs**: Draft PRs are automatically ignored until marked as "Ready for review".
 - **Binary Files**: Images, compiled binaries, and lockfiles are ignored during AI analysis.
@@ -170,7 +171,7 @@ ignore_paths:
 - **Bot does not comment on new PR**:
   - Verify that the PR is not in **Draft** state.
   - Verify that JIAN is installed on the repository via **Settings > Installed GitHub Apps**.
-  - Check backend status at https://jian-ai-reviewer.onrender.com/health (allow 30-50s if the service is waking up from spin-down).
+  - Check backend status at https://jian-ai-reviewer.onrender.com/health (allow approximately one minute if the service is waking up from spin-down).
 - **Bot does not respond to comments**:
   - Ensure your comment mentions @JIAN or @jian-ai-code-reviewer and includes a supported command like /ping or /review.
   - Bot-authored comments and automated bot replies are deliberately ignored to prevent infinite event loops.

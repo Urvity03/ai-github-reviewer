@@ -16,7 +16,7 @@ This guide walks you through registering, configuring, and deploying **JIAN 鉴*
 3. Upload **App Avatar (Profile Picture)**:
    - Click **Upload a logo...** and select `assets/jian_avatar.png` (candidate avatar).
    - > [!WARNING]
-   > **Candidate Avatar Licensing Notice**: The candidate test avatar depicts Gian (Takeshi Gouda) from *Doraemon* (© Fujiko F. Fujio / Shogakukan). While suitable for internal and controlled testing, an original custom mascot must replace it prior to broad commercial/public distribution.
+   > **Candidate Avatar Licensing Notice**: The candidate test avatar depicts Gian (Takeshi Gouda) from *Doraemon* (© Fujiko F. Fujio / Shogakukan). An avatar is not required for technical operation. However, the candidate avatar should be replaced with original or licensed artwork before any formal GitHub Marketplace submission (Marketplace approval is not guaranteed).
 4. Configure **Webhook**:
    - **Active**: Check `[x] Active`
    - **Webhook URL**: `https://<your-domain>/webhooks/github` (or your tunneling URL for local dev)

@@ -29,13 +29,14 @@ When JIAN processes a Pull Request, data interacts with three external platforms
 
 ### B. Render (Cloud Hosting Infrastructure)
 - **Role**: Hosts the JIAN container runtime and receives inbound HTTPS webhooks from GitHub.
-- **Hosting Tier**: The public demonstration instance of JIAN runs on **Render's Free Tier**.
+- **Hosting Tier**: The public demonstration backend is hosted on **Render's Free Tier**, which spins down after 15 minutes of inactivity. The first request following an idle period may experience approximately one minute of cold-start latency.
 - **Data Handled**: Inbound webhook payloads are received in memory. Render captures standard network and container execution logs (such as request timestamps, client IP addresses, HTTP status codes, and container stdout).
 - **Terms**: Governed by the [Render Privacy Policy](https://render.com/privacy).
 
 ### C. Google Gemini API (AI Provider)
 - **Role**: Provides generative machine learning analysis on code diffs to detect bugs, architectural defects, and security issues.
 - **API Version**: Google Gemini API via official Google GenAI SDK.
+- **Usage Limits**: Gemini API usage limits vary by model and usage tier. The public demonstration deployment currently uses the Gemini API Free Tier. For higher-volume usage, migrate the deployment to a paid Gemini API usage tier and monitor the model/project-specific quotas in Google AI Studio.
 - **Important Data-Use Distinction (Free Tier vs. Paid Tier)**:
   - **Current Public Deployment (Free Tier)**: The public demonstration instance of JIAN currently utilizes Google's **Gemini API Free of Charge Tier**. According to [Google's Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms#data-use) and [Google Privacy Policy](https://policies.google.com/privacy), data submitted through the Free Tier may be read by human reviewers and used by Google to provide, maintain, improve, and develop Google products, services, and machine learning technologies. Identifier-stripping is applied by Google, but repository content submitted through the Free Tier is not exempt from model training or improvement.
   - **Self-Hosted / Paid Tier**: When self-hosting JIAN or configuring a paid Gemini API key (or Google Cloud Vertex AI), Google's Paid Service terms apply. Under Google's Paid Service terms, prompts and generated responses are not used to train Google foundational models.
