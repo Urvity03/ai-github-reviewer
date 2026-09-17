@@ -17,15 +17,12 @@ RUN groupadd -g 1001 reviewer && \
 
 WORKDIR /app
 
-# Copy dependency definition
-COPY pyproject.toml .
+# Copy project metadata and application source code
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
-# Install dependencies including ruff and pytest
-RUN pip install --no-cache-dir .[dev]
-
-# Copy application source code
-COPY src/ /app/src/
-RUN pip install --no-cache-dir -e .
+# Install application and production runtime dependencies
+RUN pip install --no-cache-dir .
 
 # Switch to non-root user
 USER reviewer
