@@ -215,15 +215,26 @@ class CommandDispatcher:
 
         review_result, status = self.orchestrator.run_review(context)
 
+        verdict = (
+            "🟢 **SAFE TO MERGE**"
+            if review_result.decision.value.lower() == "approve"
+            and status.value.lower() == "passed"
+            and not review_result.findings
+            else "🟡 **REVIEW FINDINGS BEFORE MERGING**"
+        )
+
         confirm_msg = (
             f"{COMMAND_REPLY_MARKER}\n"
-            f"🚀 **Review Triggered via JIAN 鉴!**\n\n"
-            f"Successfully evaluated commit `{head_sha[:8]}`.\n"
-            f"- **Decision**: `{review_result.decision.value.upper()}`\n"
-            f"- **Status**: `{status.value}`\n"
-            f"- **Findings**: {len(review_result.findings)} issue(s) detected.\n\n"
-            "See the main review summary and inline annotations for details."
+            "🚀 **Review Triggered via JIAN 鉴!**\n\n"
+            f"### {verdict}\n\n"
+            f"Successfully evaluated commit `{head_sha[:8]}`.\n\n"
+            f"**Summary:** {review_result.summary}\n\n"
+            f"**Decision:** `{review_result.decision.value.upper()}`  \n"
+            f"**Status:** `{status.value}`  \n"
+            f"**Findings:** {len(review_result.findings)}\n\n"
+            "The detailed review summary and inline annotations are also available above."
         )
+
         self.github_client.create_issue_comment(owner, repo, issue_number, confirm_msg)
 
         return {
