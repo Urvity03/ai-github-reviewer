@@ -45,7 +45,36 @@ SECRET_PATTERNS = [
         re.compile(r"\beyJ[A-Za-z0-9\-_=]+\.eyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_.+/=]+\b"),
         SeverityEnum.HIGH,
     ),
+    (
+        "Google / Gemini API Key",
+        re.compile(r"\b(AIza[0-9A-Za-z\-_]{35})\b"),
+        SeverityEnum.CRITICAL,
+    ),
+    (
+        "Anthropic API Key",
+        re.compile(r"\b(sk-ant-[0-9A-Za-z\-_]{32,})\b"),
+        SeverityEnum.CRITICAL,
+    ),
 ]
+
+PROMPT_INJECTION_PATTERNS = [
+    re.compile(r"(?i)\bignore\s+(?:all\s+)?previous\s+instructions\b"),
+    re.compile(r"(?i)\bdisregard\s+(?:all\s+)?(?:system|previous|prior)\s+instructions\b"),
+    re.compile(r"(?i)\byou\s+are\s+now\s+(?:in\s+developer\s+mode|an\s+unrestricted\s+ai)\b"),
+    re.compile(r"(?i)\bprint\s+(?:your\s+)?system\s+prompt\b"),
+    re.compile(r"(?i)\bapprove\s+this\s+pull\s+request\s+without\s+review\b"),
+    re.compile(r"(?i)\boverride\s+(?:safety|review)\s+rules\b"),
+]
+
+
+def scan_for_prompt_injection(text: str) -> list[str]:
+    """Check text for common prompt injection and policy-override attacks."""
+    matches = []
+    for pattern in PROMPT_INJECTION_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            matches.append(m.group(0))
+    return matches
 
 
 def redact_secret(text: str) -> str:

@@ -11,6 +11,7 @@ from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request, st
 
 from ai_reviewer import __version__
 from ai_reviewer.app.auth import GitHubAppAuth
+from ai_reviewer.app.coordinator import WebhookRateLimiter
 from ai_reviewer.app.service import process_issue_comment_event, process_pull_request_event
 from ai_reviewer.app.webhook import WebhookDeliveryCache, WebhookHandler
 from ai_reviewer.commands import is_bot_comment
@@ -22,6 +23,7 @@ def create_app(
     auth: GitHubAppAuth | None = None,
     webhook_secret: str | None = None,
     delivery_cache: WebhookDeliveryCache | None = None,
+    rate_limiter: WebhookRateLimiter | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI GitHub App webhook server."""
     app = FastAPI(
@@ -34,6 +36,7 @@ def create_app(
     secret = webhook_secret or os.getenv("GITHUB_WEBHOOK_SECRET")
     webhook_handler = WebhookHandler(secret=secret)
     dedup_cache = delivery_cache or WebhookDeliveryCache()
+    limiter = rate_limiter or WebhookRateLimiter(max_requests=60, window_seconds=60.0)
 
     @app.get("/health", tags=["Monitoring"])
     def health_check() -> dict[str, str]:
@@ -101,13 +104,24 @@ def create_app(
         try:
             payload = json.loads(raw_body.decode("utf-8"))
         except Exception as err:
-            logger.error("Failed to parse webhook JSON payload: %s", err)
+            logger.error("[%s] Failed to parse webhook JSON payload: %s", x_github_delivery or "unknown", err)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Malformed JSON payload: {err}",
             )
 
-        # 4. Handle pull_request events
+        # 4. Rate limiting check per installation/repository
+        installation_id = payload.get("installation", {}).get("id")
+        rate_key = str(installation_id) if installation_id else payload.get("repository", {}).get("full_name", "global")
+        if limiter.is_rate_limited(rate_key):
+            logger.warning("[%s] Rate limit exceeded for identifier: %s", x_github_delivery or "unknown", rate_key)
+            return {
+                "status": "ignored",
+                "reason": "rate_limited",
+                "delivery_id": x_github_delivery,
+            }
+
+        # 5. Handle pull_request events
         if x_github_event == "pull_request":
             pr_event = webhook_handler.parse_pull_request_event(payload)
             if not pr_event:

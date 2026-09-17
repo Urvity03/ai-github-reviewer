@@ -7,10 +7,15 @@ import os
 from typing import Any
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from ai_reviewer.diff import parse_patch_to_hunks
 from ai_reviewer.github_comments import SUMMARY_MARKER
 from ai_reviewer.models.review import ChangedFile, CheckStatusEnum
+
+# Default timeout: 5s connect, 30s read
+DEFAULT_TIMEOUT = (5.0, 30.0)
 
 
 class GitHubClient:
@@ -24,6 +29,18 @@ class GitHubClient:
         self.token = token or os.getenv("GITHUB_TOKEN")
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
+
+        # Resilient retry strategy with exponential backoff for transient failures & rate limits
+        retries = Retry(
+            total=3,
+            backoff_factor=1.0,
+            status_forcelist=[429, 500, 502, 503, 504],
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+
         self.session.headers.update(
             {
                 "Accept": "application/vnd.github.v3+json",
@@ -40,7 +57,7 @@ class GitHubClient:
         url = f"{self.base_url}/repos/{owner}/{repo}/contents/{path.lstrip('/')}"
         params = {"ref": ref} if ref else {}
         try:
-            res = self.session.get(url, params=params, timeout=30)
+            res = self.session.get(url, params=params, timeout=DEFAULT_TIMEOUT)
             if res.status_code == 404:
                 return None
             res.raise_for_status()
@@ -55,14 +72,14 @@ class GitHubClient:
     def get_issue(self, owner: str, repo: str, issue_number: int) -> dict[str, Any]:
         """Fetch issue metadata."""
         url = f"{self.base_url}/repos/{owner}/{repo}/issues/{issue_number}"
-        res = self.session.get(url, timeout=30)
+        res = self.session.get(url, timeout=DEFAULT_TIMEOUT)
         res.raise_for_status()
         return res.json()
 
     def get_pull_request(self, owner: str, repo: str, pull_number: int) -> dict[str, Any]:
         """Fetch pull request metadata."""
         url = f"{self.base_url}/repos/{owner}/{repo}/pulls/{pull_number}"
-        res = self.session.get(url, timeout=30)
+        res = self.session.get(url, timeout=DEFAULT_TIMEOUT)
         res.raise_for_status()
         return res.json()
 
@@ -71,7 +88,7 @@ class GitHubClient:
     ) -> dict[str, Any]:
         """Post a comment to an issue or pull request discussion."""
         url = f"{self.base_url}/repos/{owner}/{repo}/issues/{issue_number}/comments"
-        res = self.session.post(url, json={"body": body}, timeout=30)
+        res = self.session.post(url, json={"body": body}, timeout=DEFAULT_TIMEOUT)
         res.raise_for_status()
         return res.json()
 
@@ -89,7 +106,7 @@ class GitHubClient:
         while True:
             try:
                 res = self.session.get(
-                    url, params={"page": page, "per_page": 100}, timeout=30
+                    url, params={"page": page, "per_page": 100}, timeout=DEFAULT_TIMEOUT
                 )
                 if res.status_code != 200:
                     break
@@ -119,7 +136,7 @@ class GitHubClient:
         page = 1
 
         while True:
-            res = self.session.get(url, params={"page": page, "per_page": 100}, timeout=30)
+            res = self.session.get(url, params={"page": page, "per_page": 100}, timeout=DEFAULT_TIMEOUT)
             res.raise_for_status()
             data = res.json()
             if not data:
@@ -158,7 +175,7 @@ class GitHubClient:
         page = 1
 
         while True:
-            res = self.session.get(url, params={"page": page, "per_page": 100}, timeout=30)
+            res = self.session.get(url, params={"page": page, "per_page": 100}, timeout=DEFAULT_TIMEOUT)
             if res.status_code != 200:
                 break
             data = res.json()
@@ -198,7 +215,7 @@ class GitHubClient:
             payload["comments"] = inline_comments
 
         try:
-            res = self.session.post(url, json=payload, timeout=30)
+            res = self.session.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
             if res.status_code in (200, 201):
                 return res.json()
             # If batch fails (e.g. 422), attempt individual comment fallback below
@@ -217,7 +234,7 @@ class GitHubClient:
                 "side": c.get("side", "RIGHT"),
             }
             try:
-                indiv_res = self.session.post(indiv_url, json=indiv_payload, timeout=30)
+                indiv_res = self.session.post(indiv_url, json=indiv_payload, timeout=DEFAULT_TIMEOUT)
                 if indiv_res.status_code in (200, 201):
                     posted_comments.append(indiv_res.json())
             except Exception:
@@ -234,7 +251,7 @@ class GitHubClient:
         page = 1
 
         while True:
-            res = self.session.get(comments_url, params={"page": page, "per_page": 100}, timeout=30)
+            res = self.session.get(comments_url, params={"page": page, "per_page": 100}, timeout=DEFAULT_TIMEOUT)
             res.raise_for_status()
             comments = res.json()
             if not comments:
@@ -252,12 +269,12 @@ class GitHubClient:
         if existing_comment_id:
             # Update existing comment
             update_url = f"{self.base_url}/repos/{owner}/{repo}/issues/comments/{existing_comment_id}"
-            up_res = self.session.patch(update_url, json={"body": summary_body}, timeout=30)
+            up_res = self.session.patch(update_url, json={"body": summary_body}, timeout=DEFAULT_TIMEOUT)
             up_res.raise_for_status()
             return up_res.json()
         else:
             # Create new comment
-            post_res = self.session.post(comments_url, json={"body": summary_body}, timeout=30)
+            post_res = self.session.post(comments_url, json={"body": summary_body}, timeout=DEFAULT_TIMEOUT)
             post_res.raise_for_status()
             return post_res.json()
 
@@ -293,7 +310,7 @@ class GitHubClient:
         }
 
         try:
-            res = self.session.post(check_url, json=check_payload, timeout=30)
+            res = self.session.post(check_url, json=check_payload, timeout=DEFAULT_TIMEOUT)
             if res.status_code in (200, 201):
                 return True
         except Exception:
@@ -313,7 +330,7 @@ class GitHubClient:
             "description": f"{status.value}: {summary[:100]}",
         }
         try:
-            st_res = self.session.post(status_url, json=status_payload, timeout=30)
+            st_res = self.session.post(status_url, json=status_payload, timeout=DEFAULT_TIMEOUT)
             return st_res.status_code in (200, 201)
         except Exception as err:
             print(f"[WARN] Failed to create commit status: {err}")
