@@ -47,6 +47,24 @@ def create_app(
             "version": __version__,
         }
 
+    @app.get("/privacy", tags=["Legal"])
+    def get_privacy() -> dict[str, str]:
+        """Return Privacy Policy overview and document link."""
+        return {
+            "app": "JIAN 鉴",
+            "policy": "Zero permanent storage. Diffs and code changes are processed ephemerally in memory.",
+            "document_url": "https://github.com/Urvity03/ai-github-reviewer/blob/master/docs/PRIVACY.md",
+        }
+
+    @app.get("/terms", tags=["Legal"])
+    def get_terms() -> dict[str, str]:
+        """Return Terms of Service overview and document link."""
+        return {
+            "app": "JIAN 鉴",
+            "terms": "AI reviews are advisory only. Developers remain solely responsible for code merged.",
+            "document_url": "https://github.com/Urvity03/ai-github-reviewer/blob/master/docs/TERMS.md",
+        }
+
     @app.post(
         "/webhooks/github",
         status_code=status.HTTP_202_ACCEPTED,

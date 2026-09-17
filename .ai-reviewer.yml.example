@@ -1,0 +1,31 @@
+﻿# .ai-reviewer.yml - JIAN 鉴 Repository Configuration Example
+# Place this file at the root of your repository to customize review behavior.
+
+review:
+  provider: gemini
+  model: gemini-3.6-flash
+  temperature: 0.1
+  confidence_threshold: 0.70
+  fail_on_severity: high        # Options: critical, high, medium, low, none
+  post_inline_comments: true
+  min_inline_severity: medium   # Options: critical, high, medium, low, info
+  max_inline_comments: 10
+
+rules:
+  syntax: true                  # Python compile() syntax verification
+  secrets: true                 # Secret and API key detection
+  ruff: true                    # Ruff linter check
+  pytest: false                 # Local test discovery
+  ml: true                      # Heuristic machine learning sanity checks
+
+custom_rules:
+  - "Ensure all public functions include comprehensive docstrings and type hints."
+  - "Do not allow hard-coded credentials, unencrypted endpoints, or raw SQL queries."
+  - "Validate all user inputs and handle potential division-by-zero or NoneType errors."
+
+ignore_paths:
+  - "vendor/**"
+  - "**/*.min.js"
+  - "dist/**"
+  - "build/**"
+  - ".venv/**"

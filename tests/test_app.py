@@ -210,10 +210,18 @@ def test_fastapi_server_endpoints():
     app = create_app(webhook_secret=secret)
     client = TestClient(app)
 
-    # 1. Health check
+    # 1. Health check & compliance endpoints
     res_health = client.get("/health")
     assert res_health.status_code == 200
     assert res_health.json()["status"] == "healthy"
+
+    res_privacy = client.get("/privacy")
+    assert res_privacy.status_code == 200
+    assert "document_url" in res_privacy.json()
+
+    res_terms = client.get("/terms")
+    assert res_terms.status_code == 200
+    assert "document_url" in res_terms.json()
 
     # 2. Missing signature header -> 401
     res_no_sig = client.post(

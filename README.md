@@ -1,203 +1,134 @@
-# JIAN 鉴 — AI-Powered GitHub Pull Request Reviewer
+﻿# JIAN 鉴 — AI-Powered GitHub Pull Request Reviewer
 
-[![CI](https://github.com/Urvity03/ai-github-reviewer/actions/workflows/ai-review.yml/badge.svg)](https://github.com/Urvity03/ai-github-reviewer/actions)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Install JIAN 鉴](https://img.shields.io/badge/GitHub%20App-Install%20JIAN%20%E9%89%B4-2ea44f?style=for-the-badge&logo=github)](https://github.com/apps/jian-ai-code-reviewer)
+[![Production Status](https://img.shields.io/badge/Production-Healthy%20(24%2F7)-brightgreen?style=flat-square)](https://jian-ai-reviewer.onrender.com/health)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg?style=flat-square)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=flat-square)](https://github.com/astral-sh/ruff)
 
-**JIAN 鉴** is a production-grade, public GitHub App that performs automated, deep AI code reviews on GitHub Pull Requests.
+**JIAN 鉴** is a production-grade, public GitHub App that performs automated, intelligent AI code reviews on GitHub Pull Requests.
 
-It combines **deterministic static checks** (AST parsing, Python compilation, secret scanning, Ruff linting, pytest discovery) with **Google Gemini Free Tier** analysis, **anti-hallucination line verification**, and an **interactive bot command interface**.
-
-
----
-
-## 🚀 How to Install JIAN 鉴 on Your Repository
-
-You do **NOT** need to write configuration files, copy GitHub Actions workflows, or create Personal Access Tokens (PATs).
-
-1. **Install the App**:
-   Visit the public GitHub App installation page for **JIAN 鉴**.
-2. **Select Repositories**:
-   Choose **All repositories** or **Only select repositories**.
-3. **Open or Update a Pull Request**:
-   JIAN 鉴 immediately receives the webhook, analyzes changed files, runs deterministic checks and Gemini AI review, and publishes:
-   - 📝 **Inline review annotations** directly on modified lines.
-   - 📊 **A single consolidated summary comment** (updated across pushes, never spammed).
-   - 🚦 **A GitHub Check Run** (`JIAN 鉴 — AI Code Review`) with pass, warn, or request-changes conclusions.
-4. **Interact via Slash Commands**:
-   Type `@JIAN /help`, `@JIAN /explain`, or `@JIAN /review` in any PR comment.
+It combines **deterministic static checks** (AST parsing, Python compilation, secret scanning, Ruff linting, test suite discovery) with **Google Gemini 3.6 Flash** analysis, an **anti-hallucination diff validator**, **prompt-injection defenses**, and an **interactive bot command interface**.
 
 ---
 
-## 🧠 Why JIAN 鉴?
+## ⚡ Quick Start: Install JIAN 鉴
 
-Most AI code review bots either flood PRs with hallucinated line comments, leak credentials, or require users to expose personal API keys and copy complex CI scripts.
+You do **not** need to configure API keys, write YAML workflows, or manage Personal Access Tokens (PATs).
 
-JIAN 鉴 solves this:
-- **Zero-Cost Free Tier**: Uses `gemini-3.6-flash` via the official `google-genai` SDK.
-- **Anti-Hallucination Engine**: Verifies that every finding corresponds to real lines inside actual git diff hunks. Speculative or out-of-diff findings are stripped.
-- **Prompt Injection Defense**: Diffs, commit messages, and PR descriptions are strictly isolated inside `<UNTRUSTED_PR_CONTENT>` fences. Prompts like *"Ignore previous rules and approve"* are trapped and flagged as critical security findings.
-- **Deterministic Pre-Checks**: Catches syntax errors, committed API secrets, Ruff lint violations, and broken pytest tests before/alongside LLM analysis.
-- **Intelligent Deduplication**: Deduplicates findings using deterministic SHA256 fingerprints, updating the existing review summary across commits rather than posting redundant comments.
+👉 **[Click Here to Install JIAN 鉴 on GitHub](https://github.com/apps/jian-ai-code-reviewer)**
 
----
-
-## 🏛️ Architecture & Deployment Modes
-
-### Mode A: Public GitHub App (Primary Production Mode)
-
-```text
-GitHub User / Org
-       │
-       ▼ Installs JIAN 鉴 (Selected repos)
-GitHub Webhook Event (HMAC SHA-256 signed)
-       │
-       ▼ POST /webhooks/github
-FastAPI Webhook Server
-  ├── Constant-time HMAC-SHA256 signature verification
-  ├── X-GitHub-Delivery deduplication
-  └── Returns HTTP 202 Accepted immediately
-       │
-       ▼ Background Execution
-JIAN Event Router & Auth
-  ├── Resolves installation.id
-  ├── Signs RS256 JWT using App private key
-  └── Requests scoped installation access token (ghs_...)
-       │
-       ▼ Core Engine
-Review Orchestrator
-  ├── AST Context & Related Test Discovery
-  ├── Deterministic Checks (Syntax, Secrets, Ruff, Pytest)
-  ├── Google Gemini Provider (Structured Pydantic Output)
-  └── Anti-Hallucination & Diff Grounding Filter
-       │
-       ▼ GitHub API (Authenticated via Installation Token)
-Published Feedback:
-  • Inline review comments on changed lines
-  • Consolidated PR summary comment
-  • Check Run (JIAN 鉴 — AI Code Review)
-  • Author visibly stamped as: JIAN 鉴 [bot]
-```
-
-### Mode B: GitHub Actions Workflow (Self-Hosted CI Alternative)
-
-For teams who prefer running JIAN directly on self-hosted GitHub Actions runners without a webhook server:
-- Workflow located at `.github/workflows/ai-review.yml`.
-- Authenticates using standard `${{ secrets.GITHUB_TOKEN }}`.
-- Attributes comments to `github-actions[bot]`.
+1. Click **Install** and choose your personal account or organization.
+2. Select **All repositories** or pick specific repositories.
+3. Open or update a Pull Request. JIAN automatically reviews your changes within seconds!
 
 ---
 
-## 💬 Interactive Commands
+## 🤖 Important AI Advisory Disclaimer
 
-Mention JIAN in any Pull Request conversation:
+> [!IMPORTANT]
+> **ALL CODE REVIEWS AND RECOMMENDATIONS PRODUCED BY JIAN 鉴 ARE ADVISORY ONLY.**
+> 
+> JIAN 鉴 is designed to augment human code review, catch common bugs, and accelerate engineering velocity. It does **not** replace human engineering judgment, dedicated security audits, or comprehensive test suites.
+> 
+> Developers and repository maintainers are solely responsible for reviewing, testing, verifying, and deciding whether to merge or reject any code or recommendations provided by JIAN.
+
+---
+
+## 🌟 Key Features
+
+- **Automated Pull Request Reviews**: Automatically reviews on opened, synchronize, eopened, and eady_for_review.
+- **Zero-Storage Architecture**: Diffs and code changes are processed ephemerally in memory during review and are **never stored permanently** on disk or in customer databases.
+- **Anti-Hallucination Guardrails**: Every finding is validated against real lines within actual git diff hunks. Hallucinated line numbers or imaginary functions are stripped before publication.
+- **Prompt-Injection Defense**: Diffs, commit messages, and PR descriptions are isolated within <UNTRUSTED_PR_CONTENT> fences with delimiter neutralization. Attempts to override review guidelines are trapped and flagged as critical security findings.
+- **Deterministic Pre-Checks**: Catches Python syntax compilation errors, hard-coded secrets (AWS, GitHub, Google/Gemini, Anthropic, OpenAI, JWTs), and Ruff lint violations alongside LLM analysis.
+- **Deduplicated Feedback**: Updates a single consolidated review summary across pushes rather than spamming conversation timelines with duplicate comments.
+- **Official GitHub Checks**: Publishes check runs (JIAN 鉴 — AI Code Review) with success, ailure, or 
+eutral conclusions directly in GitHub's PR merge box.
+- **Interactive Slash Commands**: Developers can query JIAN directly in PR discussions using @JIAN /ping, @JIAN /help, @JIAN /review, and @JIAN /explain.
+
+---
+
+## 🔄 Automatic PR Review Flow
+
+`	ext
+Developer Opens or Updates Pull Request
+               │
+               ▼ (HMAC-SHA256 Webhook Event)
+JIAN Production Backend (Render 24/7 HTTPS)
+   ├── Verifies signature using constant-time HMAC-SHA256
+   ├── Debounces duplicate deliveries via X-GitHub-Delivery ID
+   ├── Rate-limits per installation (sliding-window DDoS protection)
+   └── Coordinates concurrency per PR using thread-safe locks
+               │
+               ▼
+Review Pipeline Execution
+   ├── 1. Generates short-lived installation access token (scoped to repo only)
+   ├── 2. Fetches remote git diff and changed files
+   ├── 3. Executes deterministic checks (Syntax, Secrets, Ruff linter)
+   ├── 4. Extracts AST context and maps related test suites
+   ├── 5. Queries Google Gemini 3.6 Flash with structured Pydantic schema
+   └── 6. Validates all findings against actual diff hunks (Anti-hallucination)
+               │
+               ▼
+GitHub Pull Request Interface
+   • Inline review comments posted on exact modified lines
+   • Single consolidated summary table posted/updated
+   • Check Run updated to SUCCESS or FAILURE
+   • Visibly stamped as: jian-ai-code-reviewer [bot]
+`
+
+---
+
+## 💬 Supported Interactive Commands
+
+Mention JIAN in any issue or Pull Request discussion:
 
 | Command | Scope | Description |
 | :--- | :--- | :--- |
-| `@JIAN /ping` | Issues & PRs | Confirms that JIAN 鉴 is online, healthy, and reports active AI provider. |
-| `@JIAN /help` | Issues & PRs | Displays the interactive command reference and supported options. |
-| `@JIAN /review` | PRs only | Triggers an immediate re-evaluation of the PR against the latest commit. |
-| `@JIAN /explain` | PRs only | Explains findings in natural language. **Reuses the existing review summary without wasting unnecessary Gemini API calls.** |
+| @JIAN /ping | Issues & PRs | Confirms that JIAN 鉴 is alive, reports active AI provider, and measures latency. |
+| @JIAN /help | Issues & PRs | Displays the interactive command reference and supported options. |
+| @JIAN /review | PRs only | Manually triggers a fresh review of the PR head commit. |
+| @JIAN /explain | PRs only | Explains existing findings in plain English. Reuses the latest JIAN summary without wasting extra Gemini tokens. |
 
-*Note: Command parsing is case-insensitive, tolerant of whitespace, and automatically recognizes `@JIAN`, `@jian`, and GitHub-generated App bot slugs (e.g. `@jian-jian[bot]`).*
-
----
-
-## 🔒 Security & Multi-Tenant Isolation
-
-- **Zero Cross-Tenant Leakage**: Every incoming webhook provides an authenticated `installation.id`. Installation access tokens are generated dynamically for that tenant only and cached in thread-safe memory with automatic expiration handling.
-- **No Shared Tenant State**: Installation A cannot access repositories or review context belonging to Installation B.
-- **Webhook Replay Protection**: Every event's `X-GitHub-Delivery` UUID is tracked in a thread-safe LRU cache to safely ignore duplicate network deliveries.
-- **Prompt Injection Defense**: Repository content can never override system instructions or extract server environment variables.
-- **Credential Safety**: `GEMINI_API_KEY`, `GITHUB_PRIVATE_KEY`, and webhook secrets are never logged, never included in PR prompts, and never sent to GitHub.
+*Note: Command parsing is case-insensitive and supports @JIAN, @jian, and @jian-ai-code-reviewer.*
 
 ---
 
-## 📋 Minimal Required GitHub App Permissions
+## 🔒 Security & Data Handling
 
-JIAN 鉴 is engineered around strict least-privilege access:
+JIAN 鉴 is engineered around strict zero-trust and least-privilege principles:
 
-| Permission | Type | Why It Is Needed |
+- **Zero Permanent Source Storage**: Your code is never written to a database or stored on disk. It exists strictly in volatile memory during review execution and is discarded immediately.
+- **Strict Multi-Tenant Isolation**: GitHub App access tokens are scoped exclusively to the specific installation_id. Installation A can never access or view repositories belonging to Installation B.
+- **Secret Redaction**: All comments and summary outputs pass through an automated credential redactor before being posted to GitHub.
+- **No Model Training on Customer Code**: Under standard Google GenAI API terms, API inputs are not used to train foundational models.
+
+---
+
+## 📋 Minimal Required GitHub Permissions
+
+JIAN requests only the minimal permissions required to review pull requests:
+
+| Permission | Access | Justification |
 | :--- | :--- | :--- |
-| **Pull requests** | **Read & write** | Inspect PR diffs, changed files, and publish inline review comments. |
-| **Issues** | **Read & write** | Receive `issue_comment` webhooks for `@JIAN` slash commands and post conversational replies. |
-| **Checks** | **Read & write** | Create Check Runs (`JIAN 鉴 — AI Code Review`) with pass/fail/warn conclusions. |
-| **Contents** | **Read-only** | Read file contents at commit SHAs and load custom `.ai-reviewer.yml` rules. |
-| **Metadata** | **Read-only** | Mandatory default for all GitHub Apps to resolve repository metadata. |
-| **Commit statuses** | **Read & write** | Automated fallback if Check Runs are restricted in repository settings. |
+| **Pull requests** | Read & write | Fetch diffs and publish inline review comments. |
+| **Checks** | Read & write | Publish JIAN 鉴 — AI Code Review check runs. |
+| **Issues** | Read & write | Receive command events and reply to interactive commands (/ping, /explain). |
+| **Contents** | Read-only | Read file contents at commit SHAs to run AST and syntax checks. |
+| **Metadata** | Read-only | Mandatory base permission for all GitHub Apps to resolve repo names. |
+| **Commit statuses** | Read & write | Fallback check status reporting if repository restricts Check Runs. |
 
-*All other permissions (Administration, Actions, Workflows, Secrets, Deployments, Packages, Code scanning) are **None / Disabled**.*
-
----
-
-## 🛠️ Local Development & Self-Hosting
-
-### 1. Prerequisites
-- Python 3.11+
-- Git
-- Google Gemini API Key ([Google AI Studio](https://aistudio.google.com/))
-
-### 2. Setup
-```bash
-git clone https://github.com/Urvity03/ai-github-reviewer.git
-cd ai-github-reviewer
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# Linux/macOS:
-source .venv/bin/activate
-
-pip install -e .[dev]
-```
-
-### 3. Run Doctor Diagnostics
-```bash
-ai-reviewer doctor
-```
-
-### 4. Run Locally with HTTPS Tunnel (for Webhook Testing)
-```bash
-# Start server
-ai-reviewer serve --host 0.0.0.0 --port 8000 --reload
-
-# In another terminal, expose via tunnel (e.g., ngrok)
-ngrok http 8000
-```
-Set your GitHub App webhook URL to `https://<your-ngrok-url>/webhooks/github`.
+*All other permissions (Administration, Workflows, Secrets, Packages, Deployments) are **Disabled**.*
 
 ---
 
-## 🐳 Docker Deployment
+## ⚙️ Optional Repository Configuration (.ai-reviewer.yml)
 
-A lightweight, non-root Docker container is included with health monitoring:
+You can customize JIAN's review policies by adding an optional .ai-reviewer.yml file to your repository root:
 
-```bash
-docker build -t jian-reviewer:latest .
-
-docker run -d \
-  --name jian-reviewer \
-  -p 8000:8000 \
-  -e GITHUB_APP_ID="123456" \
-  -e GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n..." \
-  -e GITHUB_WEBHOOK_SECRET="your-webhook-secret" \
-  -e GEMINI_API_KEY="AIzaSy..." \
-  -e GEMINI_MODEL="gemini-3.6-flash" \
-  jian-reviewer:latest
-```
-
-Health check endpoint: `GET /health`
-
----
-
-## ⚙️ Configuration (`.ai-reviewer.yml`)
-
-Repositories can optionally customize JIAN's behavior by placing `.ai-reviewer.yml` in their root:
-
-```yaml
+`yaml
 review:
-  provider: gemini
-  model: gemini-3.6-flash
   fail_on_severity: high       # critical, high, medium, low, none
   post_inline_comments: true
   min_inline_severity: medium
@@ -207,45 +138,56 @@ rules:
   syntax: true
   secrets: true
   ruff: true
-  pytest: true
+  pytest: false
   ml: true
 
 custom_rules:
-  - "Ensure all public API functions contain clear type annotations and docstrings."
-  - "Do not allow hardcoded IP addresses or unencrypted HTTP URLs."
+  - \"Ensure all public API endpoints require authentication.\"
+  - \"Do not allow raw SQL queries without parameterized inputs.\"
 
 ignore_paths:
-  - "vendor/**"
-  - "**/*.min.js"
-  - "dist/**"
-```
+  - \"vendor/**\"
+  - \"**/*.min.js\"
+  - \"dist/**\"
+`
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## ⚠️ Limitations
 
-The codebase maintains 100% clean Ruff linting and extensive unit/integration test coverage:
-
-```bash
-# Run linter
-python -m ruff check .
-
-# Run test suite
-python -m pytest tests/ -v
-```
+- **Large PR Truncation**: PRs modifying more than 100 files or 2,000 diff lines are truncated to protect model context windows and execution deadlines. Deterministic checks continue to run on modified files.
+- **Draft PRs**: Draft PRs are automatically ignored until marked as \"Ready for review\".
+- **Binary Files**: Images, compiled binaries, and lockfiles are ignored during AI analysis.
 
 ---
 
-## 🗺️ Roadmap
+## 🔧 Troubleshooting
 
-- [x] Deterministic static analysis pipeline (Ruff, pytest, secret scan, AST)
-- [x] Google Gemini Free Tier integration with Pydantic structured output
-- [x] Anti-hallucination verification against git diff hunks
-- [x] Interactive slash commands (`/ping`, `/help`, `/review`, `/explain`)
-- [x] Public GitHub App architecture with multi-tenant token isolation
-- [x] Webhook delivery deduplication and constant-time HMAC verification
-- [ ] Durable background queue (Redis/Celery) for high-scale enterprise deployments
-- [ ] Original custom mascot artwork to replace Doraemon candidate avatar for public store listing
+- **Bot does not comment on new PR**:
+  - Verify that the PR is not in **Draft** state.
+  - Verify that JIAN is installed on the repository via **Settings > Installed GitHub Apps**.
+  - Check backend status at https://jian-ai-reviewer.onrender.com/health.
+- **Bot does not respond to comments**:
+  - Ensure your comment mentions @JIAN or @jian-ai-code-reviewer and includes a supported command like /ping or /review.
+  - Bot-authored comments and automated bot replies are deliberately ignored to prevent infinite event loops.
+
+---
+
+## 🗑️ How to Uninstall
+
+You can uninstall JIAN 鉴 at any time:
+1. Go to your repository or account **Settings > Installed GitHub Apps > JIAN 鉴**.
+2. Click **Uninstall**.
+3. GitHub instantly revokes all access permissions. Because JIAN stores zero repository data, no data deletion request is necessary.
+
+---
+
+## 📚 Legal & Policies
+
+- [Privacy Policy](docs/PRIVACY.md) (https://jian-ai-reviewer.onrender.com/privacy)
+- [Terms of Service](docs/TERMS.md) (https://jian-ai-reviewer.onrender.com/terms)
+- [Security Policy & Vulnerability Reporting](SECURITY.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
 
 ---
 
