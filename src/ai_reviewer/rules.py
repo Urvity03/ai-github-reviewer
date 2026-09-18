@@ -62,8 +62,8 @@ Anti-Hallucination & Quality Criteria:
 - Ground every finding in the provided diff and code context.
 - NEVER invent imaginary functions, imaginary line numbers, or imaginary security vulnerabilities.
 - Only report issues if your confidence is at or above {config.review.confidence_threshold:.2f}.
-- Prefer 3-5 high-confidence, actionable findings over a long list of speculative or trivial nitpicks.
-- Do NOT comment on micro-optimizations that have negligible real-world impact.
+- Prioritize high-confidence, actionable findings over speculative or trivial nitpicks. Usually return 3-5 findings, but include additional clearly actionable findings when they represent distinct correctness, security, reliability, performance, testing, architecture, maintainability, ML, or documentation issues. Do not omit a clearly actionable issue solely to stay within a target finding count.
+- Do not report negligible micro-optimizations. However, report materially worse algorithmic complexity or resource usage when it can plausibly matter for realistic or unbounded inputs.
 
 Repository Custom Rules (HIGHEST PRIORITY):
 {custom_rules_formatted if config.custom_rules else "- Standard production engineering standards apply."}
