@@ -184,3 +184,80 @@ def is_line_in_diff(changed_file: ChangedFile, line_number: int, require_modifie
     if require_modified:
         return line_number in changed_file.get_added_or_modified_lines()
     return line_number in changed_file.get_valid_lines()
+
+
+def _build_hunk_line_content_map(hunk: DiffHunk) -> dict[int, str]:
+    """Build a mapping from new-file line numbers to their raw content for a single hunk.
+
+    Walks the hunk lines (including the @@ header), tracking the current new-file
+    line counter for '+' and context (' '/empty) lines.  Deletion lines ('-') and
+    metadata lines ('\\ No newline …') are skipped since they have no new-file number.
+    """
+    content_map: dict[int, str] = {}
+    current_new_line = hunk.new_start
+    for raw_line in hunk.lines:
+        if HUNK_HEADER_RE.match(raw_line):
+            continue
+        if raw_line.startswith("+"):
+            # Strip the leading '+' to get the actual source content
+            content_map[current_new_line] = raw_line[1:]
+            current_new_line += 1
+        elif raw_line.startswith("-"):
+            # Deletion – does not consume a new-file line number
+            pass
+        elif raw_line.startswith(r"\ No newline at end of file"):
+            pass
+        else:
+            # Context line (starts with ' ') or empty string
+            content_map[current_new_line] = raw_line[1:] if raw_line.startswith(" ") else raw_line
+            current_new_line += 1
+    return content_map
+
+
+def snap_finding_line(changed_file: ChangedFile, line_number: int) -> int:
+    """Snap a finding's target line to the nearest non-blank added line in the same hunk.
+
+    If *line_number* points to a blank (whitespace-only) added line, search the same
+    hunk for the closest non-blank added line and return it.  Preference is given to
+    the nearest line *before* the target (since findings usually refer to code that
+    precedes a trailing blank), then to the nearest line *after*.
+
+    If the line is already non-blank, or is a context (unchanged) line, or if no
+    suitable snap target exists, the original *line_number* is returned unchanged.
+    """
+    for hunk in changed_file.hunks:
+        if line_number not in hunk.added_new_lines:
+            continue
+
+        content_map = _build_hunk_line_content_map(hunk)
+
+        # Check whether the target line is actually blank
+        target_content = content_map.get(line_number, "")
+        if target_content.strip():
+            # Target line has real content – no snapping needed
+            return line_number
+
+        # Target is blank; find the nearest non-blank *added* line in this hunk
+        best_line: int | None = None
+        best_distance = float("inf")
+
+        for candidate in sorted(hunk.added_new_lines):
+            candidate_content = content_map.get(candidate, "")
+            if not candidate_content.strip():
+                continue  # skip other blank lines
+            distance = abs(candidate - line_number)
+            # Prefer lines before the target (negative direction wins ties)
+            if distance < best_distance or (
+                distance == best_distance and best_line is not None and candidate < best_line
+            ):
+                best_distance = distance
+                best_line = candidate
+
+        if best_line is not None:
+            return best_line
+
+        # No non-blank added line found in the hunk – return original
+        return line_number
+
+    # line_number is not in any hunk's added_new_lines – return as-is
+    return line_number

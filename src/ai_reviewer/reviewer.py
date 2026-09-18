@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.console import Console
 
 from ai_reviewer.config import AppConfig, load_config
-from ai_reviewer.diff import is_line_in_diff
+from ai_reviewer.diff import is_line_in_diff, snap_finding_line
 from ai_reviewer.github_client import GitHubClient
 from ai_reviewer.github_comments import format_inline_comment, format_summary_comment
 from ai_reviewer.ml_analysis import is_ml_related_file, run_heuristic_ml_checks
@@ -211,12 +211,15 @@ class ReviewOrchestrator:
             )
 
             if can_inline:
-                key = f"{norm_file}:{finding.line}"
+                # Snap to nearest non-blank added line to avoid commenting on
+                # trailing blank lines when the AI reports a slightly off line.
+                target_line = snap_finding_line(cf, finding.line)
+                key = f"{norm_file}:{target_line}"
                 if key not in existing_keys:
                     inline_payloads.append(
                         {
                             "path": norm_file,
-                            "line": finding.line,
+                            "line": target_line,
                             "side": "RIGHT",
                             "body": format_inline_comment(finding),
                         }

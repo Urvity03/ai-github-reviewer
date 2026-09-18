@@ -1,6 +1,12 @@
 """Tests for unified diff parser and hunk analysis."""
 
-from ai_reviewer.diff import is_line_in_diff, parse_patch_to_hunks, parse_unified_diff
+from ai_reviewer.diff import (
+    is_line_in_diff,
+    parse_patch_to_hunks,
+    parse_unified_diff,
+    snap_finding_line,
+)
+from ai_reviewer.models.review import ChangedFile
 
 SAMPLE_DIFF = """diff --git a/src/calc.py b/src/calc.py
 index 83a45b1..91f13b2 100644
@@ -87,3 +93,137 @@ def test_parse_patch_to_hunks():
     assert 2 in hunk.added_new_lines
     assert 1 in hunk.valid_new_lines
     assert 3 in hunk.valid_new_lines
+
+
+# ═══════════════════════════════════════════════
+# snap_finding_line regression tests
+# ═══════════════════════════════════════════════
+
+
+def _build_jian_live_bug_file() -> ChangedFile:
+    """Build the exact ChangedFile from the live JIAN bug on Urvity03/jian-external-test#1.
+
+    Diff:
+        @@ -12,3 +12,8 @@ def format_summary(items=[]):
+             for item in items:
+                 summary_text += str(item) + ", "
+             return summary_text
+        +
+        +
+        +def get_ratio(value, divisor):
+        +    return value / divisor
+        +
+
+    New-file lines: 12-19.
+    Added lines: 15 (blank), 16 (blank), 17 (def), 18 (return), 19 (blank).
+    """
+    patch = (
+        '@@ -12,3 +12,8 @@ def format_summary(items=[]):\n'
+        '     for item in items:\n'
+        '         summary_text += str(item) + ", "\n'
+        '     return summary_text\n'
+        '+\n'
+        '+\n'
+        '+def get_ratio(value, divisor):\n'
+        '+    return value / divisor\n'
+        '+\n'
+    )
+    hunks = parse_patch_to_hunks(patch)
+    return ChangedFile(
+        filename="src/app.py",
+        status="modified",
+        additions=5,
+        deletions=0,
+        patch=patch,
+        hunks=hunks,
+    )
+
+
+def test_snap_finding_line_exact_jian_live_bug():
+    """Regression: JIAN posted comment at line 19 (trailing blank) instead of line 18
+    (return value / divisor).  snap_finding_line must correct 19 → 18."""
+    cf = _build_jian_live_bug_file()
+    assert snap_finding_line(cf, 19) == 18
+
+
+def test_snap_finding_line_exact_added_line_no_change():
+    """A finding on an exact non-blank added line must not be moved."""
+    cf = _build_jian_live_bug_file()
+    assert snap_finding_line(cf, 18) == 18  # return value / divisor
+    assert snap_finding_line(cf, 17) == 17  # def get_ratio(...)
+
+
+def test_snap_finding_line_last_code_before_trailing_blank():
+    """The last code line (18) before trailing blank (19) stays at 18."""
+    cf = _build_jian_live_bug_file()
+    # Line 18 is non-blank → returned as-is
+    assert snap_finding_line(cf, 18) == 18
+
+
+def test_snap_finding_line_blank_between_code_lines_snaps_to_nearest():
+    """Blank lines between two code lines should snap to the nearest (before preferred)."""
+    cf = _build_jian_live_bug_file()
+    # Line 16 is blank. Nearest added code lines: 17 (distance 1) and 18 (distance 2).
+    assert snap_finding_line(cf, 16) == 17
+    # Line 15 is blank. Nearest added code lines: 17 (distance 2) and 18 (distance 3).
+    assert snap_finding_line(cf, 15) == 17
+
+
+def test_snap_finding_line_multiple_hunks():
+    """Findings in multi-hunk diffs should snap within their own hunk."""
+    patch = (
+        '@@ -1,3 +1,4 @@\n'
+        ' line1\n'
+        '+added_line_A\n'
+        '+\n'
+        ' line3\n'
+        '@@ -10,2 +11,4 @@\n'
+        ' context10\n'
+        '+code_B\n'
+        '+\n'
+        ' context12\n'
+    )
+    hunks = parse_patch_to_hunks(patch)
+    cf = ChangedFile(
+        filename="multi.py", status="modified",
+        additions=4, deletions=0, patch=patch, hunks=hunks,
+    )
+    # Hunk 1: line 3 is blank added → snap to line 2 (added_line_A)
+    assert snap_finding_line(cf, 3) == 2
+    # Hunk 2: line 13 is blank added → snap to line 12 (code_B)
+    assert snap_finding_line(cf, 13) == 12
+
+
+def test_snap_finding_line_none_passthrough():
+    """snap_finding_line only receives int line numbers; the caller handles None.
+    When line is not in any hunk, it should return unchanged."""
+    cf = _build_jian_live_bug_file()
+    # Line 999 is not in any hunk
+    assert snap_finding_line(cf, 999) == 999
+
+
+def test_snap_finding_line_context_line_unchanged():
+    """Context (unchanged) lines are not in added_new_lines, so snap returns them as-is."""
+    cf = _build_jian_live_bug_file()
+    # Lines 12-14 are context lines
+    assert snap_finding_line(cf, 12) == 12
+    assert snap_finding_line(cf, 14) == 14
+
+
+def test_snap_finding_line_all_blank_hunk_returns_original():
+    """If a hunk contains only blank added lines, snap returns the original line."""
+    patch = (
+        '@@ -5,2 +5,4 @@\n'
+        ' context\n'
+        '+\n'
+        '+\n'
+        ' end\n'
+    )
+    hunks = parse_patch_to_hunks(patch)
+    cf = ChangedFile(
+        filename="blanks.py", status="modified",
+        additions=2, deletions=0, patch=patch, hunks=hunks,
+    )
+    # Line 6 is blank added, line 7 is blank added — no non-blank candidate
+    assert snap_finding_line(cf, 6) == 6
+    assert snap_finding_line(cf, 7) == 7
